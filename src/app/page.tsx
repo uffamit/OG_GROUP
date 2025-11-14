@@ -1,3 +1,5 @@
+'use client';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -10,6 +12,10 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { Logo } from '@/components/icons';
+import { useUser, useAuth } from '@/firebase';
+import { signInAnonymously } from 'firebase/auth';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 const features = [
   {
@@ -45,6 +51,39 @@ const features = [
 ];
 
 export default function LandingPage() {
+  const { user, isUserLoading } = useUser();
+  const auth = useAuth();
+  const router = useRouter();
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  const handleLoginAsPatient = async () => {
+    setIsLoggingIn(true);
+    try {
+      if (!user) {
+        await signInAnonymously(auth);
+      }
+      router.push('/patient/dashboard');
+    } catch (error) {
+      console.error('Failed to login:', error);
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleLoginAsDoctor = async () => {
+    setIsLoggingIn(true);
+    try {
+      if (!user) {
+        await signInAnonymously(auth);
+      }
+      router.push('/doctor/dashboard');
+    } catch (error) {
+      console.error('Failed to login:', error);
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -69,13 +108,29 @@ export default function LandingPage() {
               control. Seamlessly manage your health with AI-powered assistance.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row justify-center gap-4">
-                <Button asChild size="lg" className="font-semibold">
-                  <Link href="/patient/dashboard">Enter as Patient</Link>
-                </Button>
-                <Button asChild size="lg" variant="secondary" className="font-semibold">
-                  <Link href="/doctor/dashboard">Enter as Doctor</Link>
-                </Button>
+              <Button 
+                size="lg" 
+                className="font-semibold"
+                onClick={handleLoginAsPatient}
+                disabled={isLoggingIn || isUserLoading}
+              >
+                {isLoggingIn ? 'Logging in...' : 'Login as Patient'}
+              </Button>
+              <Button 
+                size="lg" 
+                variant="secondary" 
+                className="font-semibold"
+                onClick={handleLoginAsDoctor}
+                disabled={isLoggingIn || isUserLoading}
+              >
+                View Doctor Dashboard (Demo)
+              </Button>
             </div>
+            {user && (
+              <p className="mt-4 text-sm text-muted-foreground">
+                Logged in • Click above to access dashboards
+              </p>
+            )}
           </div>
         </section>
 
