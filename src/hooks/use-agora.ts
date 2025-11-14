@@ -56,7 +56,7 @@ export const useAgora = (channelName: string, userId: UID | null) => {
     }
 
     try {
-      // Fetch RTC token
+      // Fetch RTC token - MUST happen BEFORE joining
       const tokenRes = await fetch('/api/agora/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -76,7 +76,7 @@ export const useAgora = (channelName: string, userId: UID | null) => {
       await client.publish(audioTrack);
       setLocalAudioTrack(audioTrack);
 
-      // Start AI agent
+      // Start AI agent - MUST happen AFTER successfully joining
       const agentRes = await fetch('/api/agora/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -94,19 +94,32 @@ export const useAgora = (channelName: string, userId: UID | null) => {
       console.error('Failed to join channel or start agent:', error);
       toast({ title: 'Connection Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.', variant: 'destructive' });
       setIsConnected(false);
+      
+      // Clean up if we joined but agent failed to start
+      if (client.connectionState === 'CONNECTED') {
+        try {
+          localAudioTrack?.close();
+          setLocalAudioTrack(null);
+          await client.leave();
+        } catch (cleanupError) {
+          console.error('Failed to clean up after agent start failure:', cleanupError);
+        }
+      }
     }
-  }, [client, channelName, userId, toast]);
+  }, [client, channelName, userId, localAudioTrack, toast]);
 
   const leave = useCallback(async () => {
-    if (!client || !agentId) return;
+    if (!client) return;
 
     try {
-      // Stop AI agent
-      await fetch('/api/agora/stop', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agentId }),
-      });
+      // Stop AI agent - MUST happen BEFORE leaving channel
+      if (agentId) {
+        await fetch('/api/agora/stop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agentId }),
+        });
+      }
 
       // Clean up local tracks and leave channel
       localAudioTrack?.close();
@@ -115,7 +128,7 @@ export const useAgora = (channelName: string, userId: UID | null) => {
       
       setIsConnected(false);
       setAgentId(null);
-      toast({ title: 'Disconnected', description: 'Voice assistant has been disconnected.' });
+      toast({ title: 'Disconnected', description: 'You have been disconnected from the call.' });
     } catch (error) {
       console.error('Failed to leave channel or stop agent:', error);
       toast({ title: 'Disconnection Failed', description: 'Could not disconnect properly.', variant: 'destructive' });
