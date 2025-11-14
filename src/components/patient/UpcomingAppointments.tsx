@@ -25,6 +25,7 @@ interface Appointment {
   status: string;
   type: string;
   agoraChannelId: string;
+  createdAt?: any; // Firestore Timestamp
 }
 
 export function UpcomingAppointments() {
@@ -56,12 +57,18 @@ export function UpcomingAppointments() {
           <p className="text-center text-muted-foreground py-8">Loading appointments...</p>
         ) : appointments && appointments.length > 0 ? (
           <ul className="space-y-4">
-            {appointments.map((appt) => {
+            {appointments.map((appt, index) => {
               const appointmentDate = appt.appointmentTime?.toDate ? appt.appointmentTime.toDate() : new Date(appt.appointmentTime);
+              // Check if appointment was created recently (within last 5 seconds)
+              const createdAt = appt.createdAt?.toDate ? appt.createdAt.toDate() : null;
+              const isNew = createdAt && (Date.now() - createdAt.getTime()) < 5000;
+              
               return (
                 <li
                   key={appt.id}
-                  className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg"
+                  className={`flex items-center justify-between p-3 bg-secondary/50 rounded-lg transition-all ${
+                    isNew ? 'animate-pulse border-2 border-primary shadow-lg' : ''
+                  }`}
                 >
                   <div className="flex items-center gap-4">
                     <Avatar className='h-12 w-12'>
