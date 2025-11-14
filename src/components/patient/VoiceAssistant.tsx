@@ -24,10 +24,12 @@ import {
 } from '../ui/alert-dialog';
 import { Badge } from '../ui/badge';
 import { useAgora } from '@/hooks/use-agora';
-import { useUser } from '@/firebase/auth/use-user';
+import { useUser, useFirestore } from '@/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export function VoiceAssistant() {
   const { user } = useUser();
+  const firestore = useFirestore();
   const channelName = user ? `voice-assistant-${user.uid}` : '';
   const { isConnected, join, leave } = useAgora(channelName, user?.uid ?? null);
   const [symptoms, setSymptoms] = useState('');
@@ -35,6 +37,79 @@ export function VoiceAssistant() {
   const [isAnalyzing, startTransition] = useTransition();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
+
+  const handleVoiceCommand = async (command: string) => {
+    try {
+      // Parse intent using the AI API
+      const response = await fetch('/api/ai/parse-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voiceCommand: command }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to parse intent');
+      }
+
+      const result = await response.json();
+
+      // Handle different intents
+      if (result.intent === 'book_appointment' && user) {
+        // Create appointment in Firestore
+        const appointmentsRef = collection(firestore, 'appointments');
+        await addDoc(appointmentsRef, {
+          patientId: user.uid,
+          patientName: user.displayName || 'Patient',
+          doctorId: 'demo-doctor-id', // In a real app, this would be selected/matched
+          doctorName: 'Dr. Available',
+          specialty: result.parameters.specialty || 'General',
+          appointmentTime: serverTimestamp(), // In a real app, parse the date/time
+          type: 'Virtual',
+          status: 'scheduled',
+          reason: result.parameters.reason || command,
+          createdAt: serverTimestamp(),
+        });
+
+        toast({
+          title: 'Appointment Booked',
+          description: `Your appointment has been scheduled. Reason: ${result.parameters.reason || 'General consultation'}`,
+        });
+      } else if (result.intent === 'emergency' && user) {
+        // Trigger emergency alert
+        const emergencyAlertsRef = collection(firestore, 'emergencyAlerts');
+        await addDoc(emergencyAlertsRef, {
+          patientId: user.uid,
+          patientName: user.displayName || 'Unknown Patient',
+          timestamp: serverTimestamp(),
+          status: 'active',
+          location: 'Unknown',
+          reason: result.parameters.reason || command,
+        });
+
+        toast({
+          title: 'Emergency Alert Sent',
+          description: 'Emergency services have been notified.',
+          variant: 'destructive',
+        });
+      } else if (result.intent === 'symptom_check') {
+        // Use the symptom analysis
+        setSymptoms(command);
+        handleSymptomAnalysis();
+      } else {
+        toast({
+          title: 'Command Processed',
+          description: `Understood: ${result.intent}`,
+        });
+      }
+    } catch (error) {
+      console.error('Error processing voice command:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to process voice command.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const handleSymptomAnalysis = () => {
     if (!symptoms.trim()) {
@@ -101,7 +176,7 @@ export function VoiceAssistant() {
           </div>
         </div>
         <CardDescription>
-          How are you feeling today? Describe your symptoms below.
+          How are you feeling today? Describe your symptoms below or say commands like &quot;Book an appointment for tomorrow at 4 PM&quot;
         </CardDescription>
       </CardHeader>
       <CardContent className="flex-grow flex flex-col md:flex-row items-center gap-8">
@@ -121,20 +196,29 @@ export function VoiceAssistant() {
         </div>
         <div className="w-full space-y-4">
           <Textarea
-            placeholder="e.g., I have a throbbing headache and feel nauseous..."
+            placeholder="e.g., I have a throbbing headache and feel nauseous... OR Book an appointment for tomorrow at 4 PM for my cough"
             className="min-h-[100px] text-base"
             value={symptoms}
             onChange={(e) => setSymptoms(e.target.value)}
             disabled={isAnalyzing}
           />
-          <Button
-            className="w-full"
-            onClick={handleSymptomAnalysis}
-            disabled={isAnalyzing}
-          >
-            <Send className="mr-2 h-4 w-4" />
-            {isAnalyzing ? 'Analyzing...' : 'Analyze Symptoms'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              className="flex-1"
+              onClick={handleSymptomAnalysis}
+              disabled={isAnalyzing}
+            >
+              <Send className="mr-2 h-4 w-4" />
+              {isAnalyzing ? 'Analyzing...' : 'Analyze Symptoms'}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => handleVoiceCommand(symptoms)}
+              disabled={isAnalyzing || !symptoms.trim()}
+            >
+              Process Command
+            </Button>
+          </div>
         </div>
       </CardContent>
       <CardFooter className="text-center text-xs text-muted-foreground justify-center">

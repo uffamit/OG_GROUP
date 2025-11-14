@@ -14,16 +14,49 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useUser, useFirestore } from '@/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export function EmergencyButton() {
   const { toast } = useToast();
+  const { user } = useUser();
+  const firestore = useFirestore();
 
-  const handleEmergency = () => {
-    toast({
-      title: 'Emergency Alert Triggered',
-      description: 'Notifying your emergency contacts and nearest hospital.',
-      variant: 'destructive',
-    });
+  const handleEmergency = async () => {
+    if (!user) {
+      toast({
+        title: 'Authentication Required',
+        description: 'You must be logged in to trigger an emergency alert.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      // Write emergency alert to Firestore
+      const emergencyAlertsRef = collection(firestore, 'emergencyAlerts');
+      await addDoc(emergencyAlertsRef, {
+        patientId: user.uid,
+        patientName: user.displayName || 'Unknown Patient',
+        timestamp: serverTimestamp(),
+        status: 'active',
+        location: 'Unknown', // Could be enhanced with geolocation
+        reason: 'Emergency assistance requested',
+      });
+
+      toast({
+        title: 'Emergency Alert Triggered',
+        description: 'Notifying your emergency contacts and nearest hospital.',
+        variant: 'destructive',
+      });
+    } catch (error) {
+      console.error('Failed to trigger emergency alert:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to send emergency alert. Please call 911.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (

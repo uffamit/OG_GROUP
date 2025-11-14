@@ -217,5 +217,34 @@ service cloud.firestore {
       allow update: if isExistingParticipant(resource.data.patientId, resource.data.doctorId);
       allow delete: if isExistingParticipant(resource.data.patientId, resource.data.doctorId);
     }
+
+    /**
+     * @description Rules for the /emergencyAlerts/{alertId} collection.
+     * @path /emergencyAlerts/{alertId}
+     * @allow (create) Any authenticated patient can create an emergency alert.
+     * @allow (get, list) Any authenticated user can view emergency alerts.
+     * @allow (update, delete) Only the patient who created the alert can update or delete it.
+     * @principle Allows patients to trigger emergency alerts that all providers can see.
+     */
+    match /emergencyAlerts/{alertId} {
+      function isAuthenticated() {
+        return request.auth != null;
+      }
+
+      function isPatient() {
+        return isAuthenticated() && request.resource.data.patientId == request.auth.uid;
+      }
+
+      function isAlertOwner() {
+        return isAuthenticated() && resource.data.patientId == request.auth.uid;
+      }
+
+      allow get: if isAuthenticated();
+      allow list: if isAuthenticated();
+
+      allow create: if isPatient();
+      allow update: if isAlertOwner();
+      allow delete: if isAlertOwner();
+    }
   }
 }
