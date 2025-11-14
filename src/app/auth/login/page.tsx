@@ -18,6 +18,8 @@ export default function LoginPage() {
   const [role, setRole] = useState<'patient' | 'doctor'>('patient');
 
   const handleDummyLogin = () => {
+    // Store user role in localStorage for demo purposes
+    localStorage.setItem('userRole', role);
     const targetPath = role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard';
     router.push(targetPath);
   };
