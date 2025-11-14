@@ -1,3 +1,4 @@
+'use client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -8,7 +9,7 @@ import {
   User,
   Video,
 } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Logo } from '@/components/icons';
 
 const features = [
@@ -45,6 +46,22 @@ const features = [
 ];
 
 export default function LandingPage() {
+  const router = useRouter();
+
+  const handlePatientLogin = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('userRole', 'patient');
+      router.push('/patient/dashboard');
+    }
+  };
+
+  const handleDoctorLogin = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('userRole', 'doctor');
+      router.push('/doctor/dashboard');
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -69,11 +86,11 @@ export default function LandingPage() {
               control. Seamlessly manage your health with AI-powered assistance.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row justify-center gap-4">
-                <Button asChild size="lg" className="font-semibold">
-                  <Link href="/patient/dashboard">Enter as Patient</Link>
+                <Button onClick={handlePatientLogin} size="lg" className="font-semibold">
+                  Enter as Patient
                 </Button>
-                <Button asChild size="lg" variant="secondary" className="font-semibold">
-                  <Link href="/doctor/dashboard">Enter as Doctor</Link>
+                <Button onClick={handleDoctorLogin} size="lg" variant="secondary" className="font-semibold">
+                  Enter as Doctor
                 </Button>
             </div>
           </div>
