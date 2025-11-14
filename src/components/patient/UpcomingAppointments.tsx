@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { useMemoFirebase } from '@/hooks/use-memo-firebase';
+import { useMemoFirebase } from '@/firebase/provider';
 import { appointmentsCollection, Appointment } from '@/lib/firestore-helpers';
 import { query, where, orderBy } from 'firebase/firestore';
 import { useUser } from '@/firebase/auth/use-user';
@@ -23,7 +23,7 @@ export function UpcomingAppointments() {
   const router = useRouter();
 
   const appointmentsQuery = useMemoFirebase(
-    user
+    () => user
       ? query(
           appointmentsCollection,
           where('patientId', '==', user.uid),

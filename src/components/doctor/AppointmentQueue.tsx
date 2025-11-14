@@ -17,7 +17,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { useMemoFirebase } from '@/hooks/use-memo-firebase';
+import { useMemoFirebase } from '@/firebase/provider';
 import { appointmentsCollection, Appointment, alertsCollection, EmergencyAlert } from '@/lib/firestore-helpers';
 import { query, where, orderBy, limit } from 'firebase/firestore';
 import { format } from 'date-fns';
@@ -26,7 +26,7 @@ import { AlertCircle } from 'lucide-react';
 
 export function AppointmentQueue() {
   const appointmentsQuery = useMemoFirebase(
-    query(
+    () => query(
       appointmentsCollection,
       where('doctorId', '==', 'dr-demo-id'),
       where('status', '==', 'scheduled'),
@@ -37,7 +37,7 @@ export function AppointmentQueue() {
   );
 
   const alertsQuery = useMemoFirebase(
-    query(
+    () => query(
       alertsCollection,
       where('status', '==', 'active'),
       orderBy('timestamp', 'desc'),
