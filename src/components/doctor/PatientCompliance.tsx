@@ -7,7 +7,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { patientComplianceData } from '@/lib/data';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 import { ChartTooltipContent, ChartContainer } from '@/components/ui/chart';
 import type { ChartConfig } from '@/components/ui/chart';
@@ -18,6 +17,16 @@ const chartConfig = {
     color: 'hsl(var(--primary))',
   },
 } satisfies ChartConfig;
+
+const patientComplianceData = [
+  { month: 'Jan', adherence: 88 },
+  { month: 'Feb', adherence: 82 },
+  { month: 'Mar', adherence: 85 },
+  { month: 'Apr', adherence: 91 },
+  { month: 'May', adherence: 78 },
+  { month: 'Jun', adherence: 95 },
+];
+
 
 export function PatientCompliance() {
   return (

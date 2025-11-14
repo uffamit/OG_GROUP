@@ -59,10 +59,10 @@ export const patientList = [
 ];
 
 export const patientComplianceData = [
-  { month: 'Jan', adherence: Math.floor(Math.random() * 20) + 80 },
-  { month: 'Feb', adherence: Math.floor(Math.random() * 20) + 75 },
-  { month: 'Mar', adherence: Math.floor(Math.random() * 20) + 80 },
-  { month: 'Apr', adherence: Math.floor(Math.random() * 20) + 85 },
-  { month: 'May', adherence: Math.floor(Math.random() * 20) + 70 },
-  { month: 'Jun', adherence: Math.floor(Math.random() * 20) + 90 },
+  { month: 'Jan', adherence: 88 },
+  { month: 'Feb', adherence: 82 },
+  { month: 'Mar', adherence: 85 },
+  { month: 'Apr', adherence: 91 },
+  { month: 'May', adherence: 78 },
+  { month: 'Jun', adherence: 95 },
 ];
