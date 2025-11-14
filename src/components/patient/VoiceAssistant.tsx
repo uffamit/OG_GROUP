@@ -10,12 +10,13 @@ import {
 import { Textarea } from '../ui/textarea';
 import { Button } from '../ui/button';
 import { Mic, Send } from 'lucide-react';
-import { useState, useTransition, useEffect, useRef } from 'react';
+import { useState, useTransition, useCallback } from 'react';
 import { analyzeSymptoms, AnalyzeSymptomsOutput } from '@/ai/flows/voice-assistant-symptom-analysis';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
   AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -23,232 +24,207 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { Badge } from '../ui/badge';
-import { useAgora } from '@/hooks/use-agora';
 import { useUser } from '@/firebase/auth/use-user';
-import { createAppointment, createEmergencyAlert } from '@/lib/firestore-helpers';
-import { format, addDays, addHours, parse } from 'date-fns';
+import { firestore } from '@/firebase/index';
+import { addDoc, collection } from 'firebase/firestore';
 
 export function VoiceAssistant() {
   const { user } = useUser();
-  const channelName = user ? `voice-assistant-${user.uid}` : '';
-  const { isConnected, join, leave } = useAgora(channelName, user?.uid ?? null);
-  const [inputText, setInputText] = useState('');
+  const [symptoms, setSymptoms] = useState('');
   const [analysisResult, setAnalysisResult] = useState<AnalyzeSymptomsOutput | null>(null);
-  const [isProcessing, startTransition] = useTransition();
+  const [isAnalyzing, startTransition] = useTransition();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { toast } = useToast();
+  const [isEmergencyDialogOpen, setIsEmergencyDialogOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
+  const { toast } = useToast();
 
-  // Initialize speech recognition
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = 'en-US';
-
-      recognitionRef.current.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInputText(transcript);
-        handleVoiceCommand(transcript);
-        setIsListening(false);
-      };
-
-      recognitionRef.current.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error);
-        setIsListening(false);
-        toast({
-          title: 'Voice Recognition Error',
-          description: 'Could not process your voice. Please try again.',
-          variant: 'destructive',
-        });
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
-    }
-  }, []);
-
-  const parseTimeToDate = (timeStr: string): string => {
-    const now = new Date();
-    const lowerTime = timeStr.toLowerCase();
-
-    // Handle relative times
-    if (lowerTime.includes('tomorrow')) {
-      const tomorrow = addDays(now, 1);
-      const timeMatch = timeStr.match(/(\d{1,2})\s*(am|pm)/i);
-      if (timeMatch) {
-        const hours = parseInt(timeMatch[1]);
-        const isPM = timeMatch[2].toLowerCase() === 'pm';
-        const hour24 = isPM && hours !== 12 ? hours + 12 : hours;
-        tomorrow.setHours(hour24, 0, 0, 0);
-      } else {
-        tomorrow.setHours(10, 0, 0, 0); // Default to 10 AM
-      }
-      return tomorrow.toISOString();
-    }
-
-    // Handle specific times today
-    const timeMatch = timeStr.match(/(\d{1,2})\s*(am|pm)?/i);
-    if (timeMatch) {
-      const hours = parseInt(timeMatch[1]);
-      const isPM = timeMatch[2]?.toLowerCase() === 'pm' || hours >= 12;
-      const hour24 = isPM && hours !== 12 ? hours + 12 : hours === 12 && !isPM ? 0 : hours;
-      const targetDate = new Date(now);
-      targetDate.setHours(hour24, 0, 0, 0);
-      
-      // If the time has passed today, schedule for tomorrow
-      if (targetDate < now) {
-        targetDate.setDate(targetDate.getDate() + 1);
-      }
-      return targetDate.toISOString();
-    }
-
-    // Handle day names (Friday, Monday, etc.)
-    const dayMatch = lowerTime.match(/(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i);
-    if (dayMatch) {
-      const targetDay = dayMatch[1];
-      const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-      const currentDay = now.getDay();
-      const targetDayIndex = daysOfWeek.indexOf(targetDay.toLowerCase());
-      let daysToAdd = targetDayIndex - currentDay;
-      if (daysToAdd <= 0) daysToAdd += 7;
-      
-      const targetDate = addDays(now, daysToAdd);
-      const timeMatch = timeStr.match(/(\d{1,2})\s*(am|pm)/i);
-      if (timeMatch) {
-        const hours = parseInt(timeMatch[1]);
-        const isPM = timeMatch[2].toLowerCase() === 'pm';
-        const hour24 = isPM && hours !== 12 ? hours + 12 : hours;
-        targetDate.setHours(hour24, 0, 0, 0);
-      } else {
-        targetDate.setHours(10, 0, 0, 0);
-      }
-      return targetDate.toISOString();
-    }
-
-    // Default to 1 hour from now
-    return addHours(now, 1).toISOString();
-  };
-
-  const handleVoiceCommand = async (transcript: string) => {
-    startTransition(async () => {
+  const triggerEmergency = useCallback(async () => {
+    setIsEmergencyDialogOpen(true);
+    if (user) {
       try {
-        // Call the parse-intent API
-        const response = await fetch('/api/ai/parse-intent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transcript }),
+        await addDoc(collection(firestore, 'alerts'), {
+          patientId: user.uid,
+          type: 'emergency',
+          timestamp: new Date(),
         });
-
-        if (!response.ok) {
-          throw new Error('Failed to parse intent');
-        }
-
-        const result = await response.json();
-
-        if (result.intent === 'bookAppointment') {
-          // Create appointment in Firestore
-          const appointmentTime = result.dateTime ? parseTimeToDate(result.dateTime) : addHours(new Date(), 1).toISOString();
-          
-          await createAppointment({
-            patientId: user?.uid || 'demo-patient-id',
-            doctorId: 'dr-demo-id',
-            appointmentTime,
-            status: 'scheduled',
-            type: 'Virtual',
-          });
-
-          const formattedTime = format(new Date(appointmentTime), 'MMMM d, yyyy \'at\' h:mm a');
-          
-          toast({
-            title: 'Appointment Booked',
-            description: `Your appointment is scheduled for ${formattedTime}`,
-          });
-
-          // TTS feedback
-          speakText(`Your appointment is confirmed for ${formattedTime}`);
-        } else if (result.intent === 'emergency') {
-          // Create emergency alert in Firestore
-          await createEmergencyAlert({
-            patientId: user?.uid || 'demo-patient-id',
-            symptoms: result.symptoms || transcript,
-            status: 'active',
-          });
-
-          toast({
-            title: '🔴 Emergency Alert Sent',
-            description: 'Notifying doctors immediately. Help is on the way!',
-            variant: 'destructive',
-          });
-
-          // TTS feedback
-          speakText('Emergency alert has been sent. A doctor will contact you immediately.');
-        } else {
-          toast({
-            title: 'Command Not Recognized',
-            description: "Sorry, I didn't understand that. Try saying 'book an appointment' or describe your symptoms.",
-          });
-
-          // TTS feedback
-          speakText("Sorry, I didn't understand that command.");
-        }
       } catch (error) {
-        console.error('Error processing command:', error);
-        toast({
-          title: 'Processing Failed',
-          description: 'Could not process your command. Please try again.',
-          variant: 'destructive',
-        });
-      }
-    });
-  };
-
-  const speakText = (text: string) => {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-      window.speechSynthesis.speak(utterance);
-    }
-  };
-
-  const handleMicClick = () => {
-    if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-    } else {
-      if (recognitionRef.current) {
-        recognitionRef.current.start();
-        setIsListening(true);
-        toast({
-          title: 'Listening...',
-          description: 'Speak now to book an appointment or report symptoms',
-        });
-      } else {
-        toast({
-          title: 'Voice Recognition Not Available',
-          description: 'Please use the text input instead.',
-          variant: 'destructive',
-        });
+        console.error('Failed to log emergency alert:', error);
       }
     }
-  };
+  }, [user]);
 
-  const handleTextSubmit = () => {
-    if (!inputText.trim()) {
+  const processVoiceCommand = useCallback(async (transcript: string) => {
+    if (!user) {
       toast({
-        title: 'No input',
-        description: 'Please enter a command.',
+        title: 'Authentication Required',
+        description: 'Please log in first.',
         variant: 'destructive',
       });
       return;
     }
-    handleVoiceCommand(inputText);
+
+    try {
+      // Call AI intent parser
+      const response = await fetch('/api/ai/parse-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to parse intent');
+      }
+
+      const data = await response.json();
+
+      // Handle different intents
+      switch (data.intent) {
+        case 'bookAppointment':
+          if (data.dateTime && data.reason) {
+            await addDoc(collection(firestore, 'appointments'), {
+              patientId: user.uid,
+              doctorId: 'dr-demo-id', // Dummy Doctor ID
+              appointmentTime: new Date(data.dateTime),
+              reason: data.reason,
+              status: 'upcoming',
+              type: 'Virtual',
+              agoraChannelId: crypto.randomUUID(), // Unique channel ID for call
+              createdAt: new Date(),
+            });
+            toast({
+              title: 'Appointment Booked!',
+              description: `Scheduled for ${new Date(data.dateTime).toLocaleString()} - ${data.reason}`,
+            });
+          } else {
+            toast({
+              title: 'Incomplete Information',
+              description: 'Could not extract appointment details. Please try again.',
+              variant: 'destructive',
+            });
+          }
+          break;
+
+        case 'reportSymptom':
+          if (data.symptom) {
+            await addDoc(collection(firestore, 'symptoms'), {
+              patientId: user.uid,
+              symptom: data.symptom,
+              severity: data.severity || 'low',
+              timestamp: new Date(),
+            });
+            toast({
+              title: 'Symptom Logged',
+              description: 'Your doctor has been notified.',
+            });
+            if (data.severity === 'high') {
+              triggerEmergency();
+            }
+          }
+          break;
+
+        case 'emergency':
+          triggerEmergency();
+          break;
+
+        case 'showSchedule':
+          toast({
+            title: 'Schedule',
+            description: 'Check your upcoming appointments below.',
+          });
+          break;
+
+        default:
+          toast({
+            title: 'Command Not Understood',
+            description: 'Please try rephrasing your request.',
+            variant: 'destructive',
+          });
+      }
+    } catch (error) {
+      console.error('Voice command processing error:', error);
+      toast({
+        title: 'Processing Failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+    }
+  }, [user, toast, triggerEmergency]);
+
+  const startListening = () => {
+    // Check for browser support
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast({
+        title: 'Not Supported',
+        description: 'Voice commands are not supported in this browser.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    setIsListening(true);
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setSymptoms(transcript);
+      toast({
+        title: 'Voice Command Received',
+        description: `Processing: "${transcript}"`,
+      });
+      processVoiceCommand(transcript);
+      setIsListening(false);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      toast({
+        title: 'Voice Recognition Failed',
+        description: 'Could not capture voice. Please try again.',
+        variant: 'destructive',
+      });
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
+  };
+
+  const handleSymptomAnalysis = () => {
+    if (!symptoms.trim()) {
+      toast({
+        title: 'No symptoms entered',
+        description: 'Please describe your symptoms before analyzing.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const result = await analyzeSymptoms({
+          symptomsDescription: symptoms,
+        });
+        setAnalysisResult(result);
+        setIsDialogOpen(true);
+      } catch (error) {
+        toast({
+          title: 'Analysis Failed',
+          description:
+            'Could not analyze symptoms. Please try again. ' +
+            (error instanceof Error ? error.message : ''),
+          variant: 'destructive',
+        });
+        setAnalysisResult(null);
+      }
+    });
   };
 
   const getUrgencyBadgeVariant = (
@@ -271,53 +247,83 @@ export function VoiceAssistant() {
           <CardTitle>AI Voice Assistant</CardTitle>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isListening ? 'bg-red-400' : 'bg-green-400'} opacity-75`}></span>
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${isListening ? 'bg-red-500' : 'bg-green-500'}`}></span>
             </span>
-            Active
+            {isListening ? 'Listening...' : 'Ready'}
           </div>
         </div>
         <CardDescription>
-          Click the microphone or type to book appointments, report symptoms, or get help.
+          Tap the orb to speak or type your command below.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex-grow flex flex-col md:flex-row items-center gap-8">
         <div className="relative w-48 h-48 flex-shrink-0">
           <div
-            onClick={handleMicClick}
+            onClick={startListening}
             className={`absolute inset-0 rounded-full bg-primary/20 flex items-center justify-center cursor-pointer transition-all
-              ${isListening ? 'orb-speaking' : ''}
+              ${isListening ? 'orb-speaking animate-pulse' : 'hover:scale-105'}
             `}
           >
             <div className="w-32 h-32 rounded-full bg-primary/50 flex items-center justify-center">
               <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center">
-                <Mic className={`h-10 w-10 text-primary-foreground ${isListening ? 'animate-pulse' : ''}`} />
+                <Mic className="h-10 w-10 text-primary-foreground" />
               </div>
             </div>
           </div>
         </div>
         <div className="w-full space-y-4">
           <Textarea
-            placeholder="e.g., 'Book an appointment for tomorrow at 5 PM' or 'I have severe chest pain'"
+            placeholder="e.g., Book an appointment with a doctor for tomorrow at 3 PM for my cough..."
             className="min-h-[100px] text-base"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            disabled={isProcessing}
+            value={symptoms}
+            onChange={(e) => setSymptoms(e.target.value)}
+            disabled={isAnalyzing || isListening}
           />
-          <Button
-            className="w-full"
-            onClick={handleTextSubmit}
-            disabled={isProcessing}
-          >
-            <Send className="mr-2 h-4 w-4" />
-            {isProcessing ? 'Processing...' : 'Send Command'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              className="flex-1"
+              onClick={() => processVoiceCommand(symptoms)}
+              disabled={isAnalyzing || isListening || !symptoms.trim()}
+            >
+              <Send className="mr-2 h-4 w-4" />
+              {isAnalyzing ? 'Processing...' : 'Process Command'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleSymptomAnalysis}
+              disabled={isAnalyzing || isListening || !symptoms.trim()}
+            >
+              Analyze Symptoms
+            </Button>
+          </div>
         </div>
       </CardContent>
       <CardFooter className="text-center text-xs text-muted-foreground justify-center">
-        Powered by AI Voice Recognition & Agora ✨
+        Powered by Gemini AI ✨
       </CardFooter>
 
+      {/* Emergency Dialog */}
+      <AlertDialog open={isEmergencyDialogOpen} onOpenChange={setIsEmergencyDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Emergency Alert</AlertDialogTitle>
+            <AlertDialogDescription>
+              This appears to be an emergency situation. Would you like to call emergency services?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <a href="tel:108" className="bg-destructive hover:bg-destructive/90">
+                Call 108 (Emergency)
+              </a>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Symptom Analysis Dialog */}
       {analysisResult && (
         <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <AlertDialogContent>

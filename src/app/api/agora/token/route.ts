@@ -18,8 +18,7 @@ export async function POST(request: Request) {
   const role = RtcRole.PUBLISHER;
   const expirationTimeInSeconds = 3600; // 1 hour
   const currentTimestamp = Math.floor(Date.now() / 1000);
-  const tokenExpire = expirationTimeInSeconds;
-  const privilegeExpire = expirationTimeInSeconds;
+  const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
 
   // The uid must be a number for the token builder
   const numericUid = Number(uid);
@@ -33,8 +32,8 @@ export async function POST(request: Request) {
     channelName,
     numericUid,
     role,
-    tokenExpire,
-    privilegeExpire
+    privilegeExpiredTs,
+    privilegeExpiredTs
   );
 
   return NextResponse.json({ rtcToken: token });
