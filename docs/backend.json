@@ -1,0 +1,685 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the AgoraMedAI platform, including both patients and doctors.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user.",
+          "format": "email"
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the user."
+        },
+        "role": {
+          "type": "string",
+          "description": "Role of the user: 'patient' or 'doctor'."
+        },
+        "age": {
+          "type": "number",
+          "description": "Age of the user."
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number of the user."
+        },
+        "profileImage": {
+          "type": "string",
+          "description": "URL of the user's profile image.",
+          "format": "uri"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of when the user account was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp of when the user account was last updated.",
+          "format": "date-time"
+        },
+        "specialty": {
+          "type": "string",
+          "description": "Medical specialty of the doctor (if the user is a doctor)."
+        },
+        "license": {
+          "type": "string",
+          "description": "License number of the doctor (if the user is a doctor)."
+        },
+        "isVerified": {
+          "type": "boolean",
+          "description": "Indicates whether the user's account is verified."
+        },
+        "fcmToken": {
+          "type": "string",
+          "description": "Firebase Cloud Messaging token for sending push notifications."
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "name",
+        "role",
+        "age",
+        "phone",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "VoiceConversation": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "VoiceConversation",
+      "type": "object",
+      "description": "Represents a single conversation between a user and the AI voice assistant.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the voice conversation entry."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N VoiceConversation)"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of the conversation.",
+          "format": "date-time"
+        },
+        "userInput": {
+          "type": "string",
+          "description": "User's input in the conversation."
+        },
+        "assistantResponse": {
+          "type": "string",
+          "description": "AI assistant's response in the conversation."
+        },
+        "intent": {
+          "type": "string",
+          "description": "The intent of the user's input (e.g., schedule, symptom, booking, emergency)."
+        },
+        "actionTaken": {
+          "type": "string",
+          "description": "Action taken by the system based on the user's input."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "timestamp",
+        "userInput",
+        "assistantResponse",
+        "intent",
+        "actionTaken"
+      ]
+    },
+    "Medication": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Medication",
+      "type": "object",
+      "description": "Represents a medication prescribed to or taken by a patient.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the medication entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Medication)"
+        },
+        "medicineName": {
+          "type": "string",
+          "description": "Name of the medication."
+        },
+        "dosage": {
+          "type": "string",
+          "description": "Dosage of the medication."
+        },
+        "frequency": {
+          "type": "string",
+          "description": "Frequency of taking the medication (e.g., daily, twice a day)."
+        },
+        "times": {
+          "type": "array",
+          "description": "Array of times the medication should be taken each day.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "startDate": {
+          "type": "string",
+          "description": "Date when the medication intake started.",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "Date when the medication intake ends.",
+          "format": "date-time"
+        },
+        "remindersEnabled": {
+          "type": "boolean",
+          "description": "Indicates whether reminders are enabled for this medication."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes about the medication."
+        },
+        "prescribedBy": {
+          "type": "string",
+          "description": "Reference to Doctor. (Relationship: Doctor 1:N Medication) The doctor who prescribed the medication."
+        },
+        "intakeLog": {
+          "type": "array",
+          "description": "Log of medication intake instances.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "medicineName",
+        "dosage",
+        "frequency",
+        "times",
+        "startDate",
+        "endDate",
+        "remindersEnabled"
+      ]
+    },
+    "DailyRoutine": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DailyRoutine",
+      "type": "object",
+      "description": "Represents a patient's daily schedule and routines.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the daily routine entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N DailyRoutine)"
+        },
+        "wakeTime": {
+          "type": "string",
+          "description": "Time the user wakes up."
+        },
+        "sleepTime": {
+          "type": "string",
+          "description": "Time the user goes to sleep."
+        },
+        "walkScheduleTime": {
+          "type": "string",
+          "description": "Time for walk schedule"
+        },
+        "walkScheduleDuration": {
+          "type": "number",
+          "description": "Duration of the walking schedule in minutes."
+        },
+        "walkScheduleCompleted": {
+          "type": "boolean",
+          "description": "Indicates whether the walking schedule was completed."
+        },
+        "meals": {
+          "type": "array",
+          "description": "Array of meals with associated times and completion status.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "waterIntakeTarget": {
+          "type": "number",
+          "description": "Target water intake in ml."
+        },
+        "waterIntakeCurrent": {
+          "type": "number",
+          "description": "Current water intake in ml."
+        },
+        "waterIntakeLogs": {
+          "type": "array",
+          "description": "Array of timestamps indicating water intake times.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dailyProgress": {
+          "type": "number",
+          "description": "Daily progress percentage (0-100)."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "wakeTime",
+        "sleepTime",
+        "waterIntakeTarget",
+        "waterIntakeCurrent",
+        "dailyProgress"
+      ]
+    },
+    "Appointment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Appointment",
+      "type": "object",
+      "description": "Represents an appointment between a patient and a doctor.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the appointment entity."
+        },
+        "patientId": {
+          "type": "string",
+          "description": "Reference to User (Patient). (Relationship: User 1:N Appointment)"
+        },
+        "doctorId": {
+          "type": "string",
+          "description": "Reference to User (Doctor). (Relationship: User 1:N Appointment)"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date of the appointment.",
+          "format": "date-time"
+        },
+        "time": {
+          "type": "string",
+          "description": "Time of the appointment."
+        },
+        "duration": {
+          "type": "number",
+          "description": "Duration of the appointment in minutes."
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of appointment: 'in-person' or 'virtual'."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the appointment: 'scheduled', 'completed', 'cancelled', or 'no-show'."
+        },
+        "symptoms": {
+          "type": "string",
+          "description": "Symptoms reported by the patient."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes about the appointment."
+        },
+        "prescriptionId": {
+          "type": "string",
+          "description": "Reference to Prescription. (Relationship: Prescription 1:1 Appointment) The prescription associated with this appointment."
+        },
+        "paymentStatus": {
+          "type": "string",
+          "description": "Payment status of the appointment: 'pending' or 'completed'."
+        },
+        "meetingLink": {
+          "type": "string",
+          "description": "Link for virtual consultation (if applicable).",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "id",
+        "patientId",
+        "doctorId",
+        "date",
+        "time",
+        "duration",
+        "type",
+        "status"
+      ]
+    },
+    "EmergencyContact": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "EmergencyContact",
+      "type": "object",
+      "description": "Represents an emergency contact for a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the emergency contact entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N EmergencyContact)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the emergency contact."
+        },
+        "relationship": {
+          "type": "string",
+          "description": "Relationship of the contact to the user."
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number of the emergency contact."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the emergency contact.",
+          "format": "email"
+        },
+        "notifyOnEmergency": {
+          "type": "boolean",
+          "description": "Indicates whether to notify this contact in case of an emergency."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "name",
+        "relationship",
+        "phone",
+        "notifyOnEmergency"
+      ]
+    },
+    "DoctorPatientRelationship": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DoctorPatientRelationship",
+      "type": "object",
+      "description": "Represents the relationship between a doctor and a patient.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the doctor-patient relationship."
+        },
+        "doctorId": {
+          "type": "string",
+          "description": "Reference to User (Doctor). (Relationship: Doctor 1:N DoctorPatientRelationship)"
+        },
+        "patientId": {
+          "type": "string",
+          "description": "Reference to User (Patient). (Relationship: Patient 1:N DoctorPatientRelationship)"
+        },
+        "assignedDate": {
+          "type": "string",
+          "description": "Timestamp of when the patient was assigned to the doctor.",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the relationship: 'active' or 'inactive'."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes about the relationship."
+        },
+        "lastVisit": {
+          "type": "string",
+          "description": "Timestamp of the patient's last visit with the doctor.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "doctorId",
+        "patientId",
+        "assignedDate",
+        "status"
+      ]
+    },
+    "Prescription": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Prescription",
+      "type": "object",
+      "description": "Represents a medication prescription issued by a doctor to a patient.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the prescription entity."
+        },
+        "doctorId": {
+          "type": "string",
+          "description": "Reference to User (Doctor). (Relationship: Doctor 1:N Prescription)"
+        },
+        "patientId": {
+          "type": "string",
+          "description": "Reference to User (Patient). (Relationship: Patient 1:N Prescription)"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date the prescription was issued.",
+          "format": "date-time"
+        },
+        "medications": {
+          "type": "array",
+          "description": "Array of medications included in the prescription.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "diagnosis": {
+          "type": "string",
+          "description": "Diagnosis for which the prescription was issued."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes about the prescription."
+        },
+        "followUp": {
+          "type": "string",
+          "description": "Timestamp for a follow-up appointment.",
+          "format": "date-time"
+        },
+        "digitalSignature": {
+          "type": "string",
+          "description": "URL of the doctor's digital signature.",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "id",
+        "doctorId",
+        "patientId",
+        "date",
+        "medications",
+        "diagnosis"
+      ]
+    },
+    "IntakeLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "IntakeLog",
+      "type": "object",
+      "description": "Represents a log of medication intake.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the intake log entry."
+        },
+        "medicationId": {
+          "type": "string",
+          "description": "Reference to Medication. (Relationship: Medication 1:N IntakeLog)"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date of the intake.",
+          "format": "date-time"
+        },
+        "taken": {
+          "type": "boolean",
+          "description": "Indicates whether the medication was taken."
+        },
+        "time": {
+          "type": "string",
+          "description": "Time the medication was taken."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes about the intake."
+        }
+      },
+      "required": [
+        "id",
+        "medicationId",
+        "date",
+        "taken",
+        "time"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "user",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profile information. Secured by `request.auth.uid == userId`.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/voiceConversations/{voiceConversationId}",
+        "definition": {
+          "entityName": "voiceConversation",
+          "schema": {
+            "$ref": "#/backend/entities/VoiceConversation"
+          },
+          "description": "Stores voice conversation data for each user. Secured by `request.auth.uid == userId`.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "voiceConversationId",
+              "description": "The unique identifier for the voice conversation."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/medications/{medicationId}",
+        "definition": {
+          "entityName": "medication",
+          "schema": {
+            "$ref": "#/backend/entities/Medication"
+          },
+          "description": "Stores medication information for each user. Secured by `request.auth.uid == userId`.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "medicationId",
+              "description": "The unique identifier for the medication."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/dailyRoutines/{dailyRoutineId}",
+        "definition": {
+          "entityName": "dailyRoutine",
+          "schema": {
+            "$ref": "#/backend/entities/DailyRoutine"
+          },
+          "description": "Stores daily routine information for each user. Secured by `request.auth.uid == userId`.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "dailyRoutineId",
+              "description": "The unique identifier for the daily routine."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/appointments/{appointmentId}",
+        "definition": {
+          "entityName": "appointment",
+          "schema": {
+            "$ref": "#/backend/entities/Appointment"
+          },
+          "description": "Stores appointment information. Includes 'patientId' and 'doctorId' for authorization independence.",
+          "params": [
+            {
+              "name": "appointmentId",
+              "description": "The unique identifier for the appointment."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/emergencyContacts/{emergencyContactId}",
+        "definition": {
+          "entityName": "emergencyContact",
+          "schema": {
+            "$ref": "#/backend/entities/EmergencyContact"
+          },
+          "description": "Stores emergency contact information for each user. Secured by `request.auth.uid == userId`.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "emergencyContactId",
+              "description": "The unique identifier for the emergency contact."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/doctorPatientRelationships/{doctorPatientRelationshipId}",
+        "definition": {
+          "entityName": "doctorPatientRelationship",
+          "schema": {
+            "$ref": "#/backend/entities/DoctorPatientRelationship"
+          },
+          "description": "Stores relationships between doctors and patients. Includes 'doctorId' and 'patientId' for authorization independence.",
+          "params": [
+            {
+              "name": "doctorPatientRelationshipId",
+              "description": "The unique identifier for the doctor-patient relationship."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/prescriptions/{prescriptionId}",
+        "definition": {
+          "entityName": "prescription",
+          "schema": {
+            "$ref": "#/backend/entities/Prescription"
+          },
+          "description": "Stores prescription information. Includes 'doctorId' and 'patientId' for authorization independence.",
+          "params": [
+            {
+              "name": "prescriptionId",
+              "description": "The unique identifier for the prescription."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure prioritizes authorization independence and QAPs. User data and their associated subcollections (voice conversations, medications, routines, emergency contacts) are structured under `/users/{userId}`. This path-based ownership ensures that security rules can be written based on `request.auth.uid == userId`, avoiding complex `get()` calls.  For collaborative data such as appointments involving both patients and doctors, the patient id and the doctor id are stored directly in the document. For relationships between doctors and patients, the same logic applies in `/doctorPatientRelationships`. Authorization independence is achieved by directly linking the relevant UIDs within each document.  The structure facilitates secure list operations by ensuring that all documents within a collection share the same security posture.  Medication intake logs are embedded within the Medication document, simplifying access and maintaining data locality for common operations."
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "placeholderImages": [
+    {
+      "id": "patient_avatar_1",
+      "description": "Patient avatar",
+      "imageUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxwZXJzb24lMjBwb3J0cmFpdHxlbnwwfHx8fDE3NjMwMzQ3OTF8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "doctor_avatar_1",
+      "description": "Doctor avatar 1",
+      "imageUrl": "https://images.unsplash.com/photo-1758691462123-8a17ae95d203?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxkb2N0b3IlMjBwcm9mZXNzaW9uYWx8ZW58MHx8fHwxNzYzMDUzNjk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "doctor professional"
+    },
+    {
+      "id": "doctor_avatar_2",
+      "description": "Doctor avatar 2",
+      "imageUrl": "https://images.unsplash.com/photo-1758691461516-7e716e0ca135?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxkb2N0b3IlMjBzbWlsaW5nfGVufDB8fHx8MTc2MzA4NDE5OHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "doctor smiling"
+    },
+    {
+      "id": "doctor_avatar_3",
+      "description": "Doctor avatar 3",
+      "imageUrl": "https://images.unsplash.com/photo-1659353887977-c310d90c751a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxkb2N0b3IlMjBmcmllbmRseXxlbnwwfHx8fDE3NjMxMTAxMTN8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "doctor friendly"
+    },
+    {
+      "id": "patient_avatar_2",
+      "description": "Patient avatar 2",
+      "imageUrl": "https://images.unsplash.com/photo-1484863137850-59afcfe05386?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBzbWlsaW5nfGVufDB8fHx8MTc2MzAzMjg1OXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person smiling"
+    },
+    {
+      "id": "patient_avatar_3",
+      "description": "Patient avatar 3",
+      "imageUrl": "https://images.unsplash.com/photo-1602524651752-7f9741970987?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxwZXJzb24lMjBvdXRzaWRlfGVufDB8fHx8MTc2MzEwNjYzNXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person outside"
+    },
+    {
+      "id": "patient_avatar_4",
+      "description": "Patient avatar 4",
+      "imageUrl": "https://images.unsplash.com/photo-1752716217818-88025e1801c0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxwZXJzb24lMjBwcm9mZXNzaW9uYWx8ZW58MHx8fHwxNzYzMTAxMzY3fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person professional"
+    },
+    {
+      "id": "patient_avatar_5",
+      "description": "Patient avatar 5",
+      "imageUrl": "https://images.unsplash.com/photo-1595111633191-7a8c1b0f7f98?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxwZXJzb24lMjByZWFkaW5nfGVufDB8fHx8MTc2MzA0MDQxOXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person reading"
+    }
+  ]
+}

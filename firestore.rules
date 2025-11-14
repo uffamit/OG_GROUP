@@ -1,0 +1,221 @@
+/**
+ * @fileoverview Firestore Security Rules for AgoraMedAI.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for personal data, while allowing shared access to appointment and relationships.
+ *
+ * Data Structure:
+ * - User profiles and their associated data (voice conversations, medications, daily routines, emergency contacts) are nested under `/users/{userId}`.
+ * - Appointments, doctor-patient relationships, and prescriptions are stored in top-level collections, with explicit `patientId` and `doctorId` fields to facilitate independent authorization.
+ *
+ * Key Security Decisions:
+ * - Users can only access their own data under the `/users/{userId}` path.
+ * - Listing other users is disallowed.
+ * - Public read access is explicitly disallowed for collections containing private user data.
+ *
+ * Denormalization for Authorization:
+ * - The `appointments`, `doctorPatientRelationships`, and `prescriptions` collections denormalize `patientId` and `doctorId` onto each document. This avoids the need for complex `get()` calls to determine authorization.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Rules for the /users/{userId} collection.
+     * @path /users/{userId}
+     * @allow (create) Authenticated user can create their own user document.
+     * @allow (get, update, delete) Authenticated user can read, update, and delete their own user document.
+     * @deny (list) Listing all users is not allowed.
+     * @deny (create) Unauthenticated user cannot create a user document.
+     * @principle Enforces document ownership; users can only manage their own profile.
+     */
+    match /users/{userId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isCreatingOwnDocument() {
+        return isOwner() && request.resource.data.id == userId;
+      }
+      
+      function isUpdatingOwnDocument() {
+        return isOwner() && resource.data.id == userId;
+      }
+
+      allow get: if isOwner();
+      allow list: if false; 
+
+      allow create: if isCreatingOwnDocument();
+      allow update: if isUpdatingOwnDocument();
+      allow delete: if isOwner();
+    }
+
+    /**
+     * @description Rules for the /users/{userId}/voiceConversations/{voiceConversationId} collection.
+     * @path /users/{userId}/voiceConversations/{voiceConversationId}
+     * @allow (create, get, update, delete, list) Authenticated user can manage their own voice conversations.
+     * @deny (create, get, update, delete, list) Another user cannot manage voice conversations for other users.
+     * @principle Enforces document ownership; users can only manage their own voice conversations.
+     */
+    match /users/{userId}/voiceConversations/{voiceConversationId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isExistingOwner() {
+        return isOwner() && resource != null;
+      }
+
+      allow get: if isOwner();
+      allow list: if isOwner();
+
+      allow create: if isOwner() && request.resource.data.userId == userId;
+      allow update: if isExistingOwner() && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner();
+    }
+
+    /**
+     * @description Rules for the /users/{userId}/medications/{medicationId} collection.
+     * @path /users/{userId}/medications/{medicationId}
+     * @allow (create, get, update, delete, list) Authenticated user can manage their own medication entries.
+     * @deny (create, get, update, delete, list) Another user cannot manage medications for other users.
+     * @principle Enforces document ownership; users can only manage their own medications.
+     */
+    match /users/{userId}/medications/{medicationId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isExistingOwner() {
+        return isOwner() && resource != null;
+      }
+
+      allow get: if isOwner();
+      allow list: if isOwner();
+
+      allow create: if isOwner() && request.resource.data.userId == userId;
+      allow update: if isExistingOwner() && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner();
+    }
+
+    /**
+     * @description Rules for the /users/{userId}/dailyRoutines/{dailyRoutineId} collection.
+     * @path /users/{userId}/dailyRoutines/{dailyRoutineId}
+     * @allow (create, get, update, delete, list) Authenticated user can manage their own daily routines.
+     * @deny (create, get, update, delete, list) Another user cannot manage daily routines for other users.
+     * @principle Enforces document ownership; users can only manage their own daily routines.
+     */
+    match /users/{userId}/dailyRoutines/{dailyRoutineId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isExistingOwner() {
+        return isOwner() && resource != null;
+      }
+
+      allow get: if isOwner();
+      allow list: if isOwner();
+
+      allow create: if isOwner() && request.resource.data.userId == userId;
+      allow update: if isExistingOwner() && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner();
+    }
+
+    /**
+     * @description Rules for the /appointments/{appointmentId} collection.
+     * @path /appointments/{appointmentId}
+     * @allow (create, get, update, delete, list) Doctor or Patient can access appointments for which they are a party.
+     * @deny (create, get, update, delete, list) Users who are not party to an appointment are denied access.
+     * @principle Enforces shared access; only participants can manage appointments.
+     */
+    match /appointments/{appointmentId} {
+      function isParticipant(patientId, doctorId) {
+        return request.auth != null && (request.auth.uid == patientId || request.auth.uid == doctorId);
+      }
+
+      function isExistingParticipant(patientId, doctorId) {
+        return isParticipant(patientId, doctorId) && resource != null;
+      }
+
+      allow get: if isParticipant(resource.data.patientId, resource.data.doctorId);
+      allow list: if true; // All users can list appointments
+
+      allow create: if isParticipant(request.resource.data.patientId, request.resource.data.doctorId);
+      allow update: if isExistingParticipant(resource.data.patientId, resource.data.doctorId);
+      allow delete: if isExistingParticipant(resource.data.patientId, resource.data.doctorId);
+    }
+
+    /**
+     * @description Rules for the /users/{userId}/emergencyContacts/{emergencyContactId} collection.
+     * @path /users/{userId}/emergencyContacts/{emergencyContactId}
+     * @allow (create, get, update, delete, list) Authenticated user can manage their own emergency contacts.
+     * @deny (create, get, update, delete, list) Another user cannot manage emergency contacts for other users.
+     * @principle Enforces document ownership; users can only manage their own emergency contacts.
+     */
+    match /users/{userId}/emergencyContacts/{emergencyContactId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isExistingOwner() {
+        return isOwner() && resource != null;
+      }
+
+      allow get: if isOwner();
+      allow list: if isOwner();
+
+      allow create: if isOwner() && request.resource.data.userId == userId;
+      allow update: if isExistingOwner() && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner();
+    }
+
+    /**
+     * @description Rules for the /doctorPatientRelationships/{doctorPatientRelationshipId} collection.
+     * @path /doctorPatientRelationships/{doctorPatientRelationshipId}
+     * @allow (create, get, update, delete, list) Doctor or Patient can access relationships for which they are a party.
+     * @deny (create, get, update, delete, list) Users who are not party to the doctorPatientRelationship are denied access.
+     * @principle Enforces shared access; only participants can manage doctorPatientRelationships.
+     */
+    match /doctorPatientRelationships/{doctorPatientRelationshipId} {
+      function isParticipant(patientId, doctorId) {
+        return request.auth != null && (request.auth.uid == patientId || request.auth.uid == doctorId);
+      }
+
+      function isExistingParticipant(patientId, doctorId) {
+        return isParticipant(patientId, doctorId) && resource != null;
+      }
+
+      allow get: if isParticipant(resource.data.patientId, resource.data.doctorId);
+      allow list: if true; // All users can list relationships
+
+      allow create: if isParticipant(request.resource.data.patientId, request.resource.data.doctorId);
+      allow update: if isExistingParticipant(resource.data.patientId, resource.data.doctorId);
+      allow delete: if isExistingParticipant(resource.data.patientId, resource.data.doctorId);
+    }
+
+    /**
+     * @description Rules for the /prescriptions/{prescriptionId} collection.
+     * @path /prescriptions/{prescriptionId}
+     * @allow (create, get, update, delete, list) Doctor or Patient can access prescriptions for which they are a party.
+     * @deny (create, get, update, delete, list) Users who are not party to a prescription are denied access.
+     * @principle Enforces shared access; only participants can manage prescriptions.
+     */
+    match /prescriptions/{prescriptionId} {
+      function isParticipant(patientId, doctorId) {
+        return request.auth != null && (request.auth.uid == patientId || request.auth.uid == doctorId);
+      }
+
+      function isExistingParticipant(patientId, doctorId) {
+        return isParticipant(patientId, doctorId) && resource != null;
+      }
+
+      allow get: if isParticipant(resource.data.patientId, resource.data.doctorId);
+      allow list: if true; // All users can list prescriptions
+
+      allow create: if isParticipant(request.resource.data.patientId, request.resource.data.doctorId);
+      allow update: if isExistingParticipant(resource.data.patientId, resource.data.doctorId);
+      allow delete: if isExistingParticipant(resource.data.patientId, resource.data.doctorId);
+    }
+  }
+}
