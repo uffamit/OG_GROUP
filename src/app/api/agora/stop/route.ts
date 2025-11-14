@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
   const { agentId } = await request.json();
 
-  const agoraAppId = process.env.AGORA_APP_ID;
+  const agoraAppId = process.env.NEXT_PUBLIC_AGORA_APP_ID;
   const customerId = process.env.AGORA_CUSTOMER_ID;
   const customerSecret = process.env.AGORA_CUSTOMER_SECRET;
 

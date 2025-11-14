@@ -14,46 +14,48 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/firebase/auth/use-user';
-import { createEmergencyAlert } from '@/lib/firestore-helpers';
-import { useState } from 'react';
+import { useUser, useFirestore } from '@/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export function EmergencyButton() {
   const { toast } = useToast();
   const { user } = useUser();
-  const [isTriggering, setIsTriggering] = useState(false);
+  const firestore = useFirestore();
 
   const handleEmergency = async () => {
-    setIsTriggering(true);
+    if (!user) {
+      toast({
+        title: 'Authentication Required',
+        description: 'You must be logged in to trigger an emergency alert.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
-      await createEmergencyAlert({
-        patientId: user?.uid || 'demo-patient-id',
-        symptoms: 'Emergency button pressed - immediate assistance required',
+      // Write emergency alert to Firestore
+      const emergencyAlertsRef = collection(firestore, 'emergencyAlerts');
+      await addDoc(emergencyAlertsRef, {
+        patientId: user.uid,
+        patientName: user.displayName || 'Unknown Patient',
+        timestamp: serverTimestamp(),
         status: 'active',
+        location: 'Unknown', // Could be enhanced with geolocation
+        reason: 'Emergency assistance requested',
       });
 
       toast({
-        title: '🔴 Emergency Alert Triggered',
+        title: 'Emergency Alert Triggered',
         description: 'Notifying your emergency contacts and nearest hospital.',
         variant: 'destructive',
       });
-
-      // TTS feedback
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(
-          'Emergency alert has been sent. Help is on the way.'
-        );
-        window.speechSynthesis.speak(utterance);
-      }
     } catch (error) {
-      console.error('Error triggering emergency:', error);
+      console.error('Failed to trigger emergency alert:', error);
       toast({
         title: 'Error',
-        description: 'Could not trigger emergency alert. Please call 911.',
+        description: 'Failed to send emergency alert. Please call 911.',
         variant: 'destructive',
       });
-    } finally {
-      setIsTriggering(false);
     }
   };
 
@@ -64,7 +66,6 @@ export function EmergencyButton() {
           variant="destructive"
           size="icon"
           className="fixed bottom-6 right-6 h-16 w-16 rounded-full shadow-2xl z-50 animate-pulse"
-          disabled={isTriggering}
         >
           <HeartPulse className="h-8 w-8" />
           <span className="sr-only">Emergency</span>
