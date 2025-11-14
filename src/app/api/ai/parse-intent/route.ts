@@ -3,24 +3,24 @@ import { parseIntent } from '@/ai/flows/intent-parser';
 
 export async function POST(request: Request) {
   try {
-    const { voiceCommand } = await request.json();
+    const body = await request.json();
+    const { transcript } = body;
 
-    if (!voiceCommand || typeof voiceCommand !== 'string') {
+    if (!transcript || typeof transcript !== 'string') {
       return NextResponse.json(
-        { error: 'voiceCommand is required and must be a string' },
+        { error: 'transcript is required and must be a string' },
         { status: 400 }
       );
     }
 
-    const result = await parseIntent({ voiceCommand });
-    
+    const result = await parseIntent({ transcript });
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error parsing intent:', error);
+    console.error('Intent parsing error:', error);
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to parse intent',
-        details: error instanceof Error ? error.message : 'Unknown error' 
+        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );

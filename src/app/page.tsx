@@ -10,12 +10,12 @@ import {
   User,
   Video,
 } from 'lucide-react';
-import Link from 'next/link';
 import { Logo } from '@/components/icons';
-import { useUser, useAuth } from '@/firebase';
+import { auth } from '@/firebase/index';
 import { signInAnonymously } from 'firebase/auth';
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
 
 const features = [
   {
@@ -51,36 +51,28 @@ const features = [
 ];
 
 export default function LandingPage() {
-  const { user, isUserLoading } = useUser();
-  const auth = useAuth();
   const router = useRouter();
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState<string | null>(null);
 
-  const handleLoginAsPatient = async () => {
-    setIsLoggingIn(true);
+  const handleLogin = async (role: 'patient' | 'doctor') => {
+    setIsLoading(role);
     try {
-      if (!user) {
-        await signInAnonymously(auth);
-      }
-      router.push('/patient/dashboard');
+      await signInAnonymously(auth);
+      localStorage.setItem('userRole', role);
+      router.push(role === 'patient' ? '/patient/dashboard' : '/doctor/dashboard');
+      toast({
+        title: 'Success',
+        description: `Logged in as ${role === 'patient' ? 'Patient' : 'Doctor'}`,
+      });
     } catch (error) {
-      console.error('Failed to login:', error);
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
-  const handleLoginAsDoctor = async () => {
-    setIsLoggingIn(true);
-    try {
-      if (!user) {
-        await signInAnonymously(auth);
-      }
-      router.push('/doctor/dashboard');
-    } catch (error) {
-      console.error('Failed to login:', error);
-    } finally {
-      setIsLoggingIn(false);
+      console.error('Anonymous login failed', error);
+      toast({
+        title: 'Login Failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+      setIsLoading(null);
     }
   };
 
@@ -108,29 +100,24 @@ export default function LandingPage() {
               control. Seamlessly manage your health with AI-powered assistance.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row justify-center gap-4">
-              <Button 
-                size="lg" 
-                className="font-semibold"
-                onClick={handleLoginAsPatient}
-                disabled={isLoggingIn || isUserLoading}
-              >
-                {isLoggingIn ? 'Logging in...' : 'Login as Patient'}
-              </Button>
-              <Button 
-                size="lg" 
-                variant="secondary" 
-                className="font-semibold"
-                onClick={handleLoginAsDoctor}
-                disabled={isLoggingIn || isUserLoading}
-              >
-                View Doctor Dashboard (Demo)
-              </Button>
+                <Button 
+                  size="lg" 
+                  className="font-semibold"
+                  onClick={() => handleLogin('patient')}
+                  disabled={isLoading !== null}
+                >
+                  {isLoading === 'patient' ? 'Loading...' : 'Login as Patient'}
+                </Button>
+                <Button 
+                  size="lg" 
+                  variant="secondary" 
+                  className="font-semibold"
+                  onClick={() => handleLogin('doctor')}
+                  disabled={isLoading !== null}
+                >
+                  {isLoading === 'doctor' ? 'Loading...' : 'View Doctor Dashboard (Demo)'}
+                </Button>
             </div>
-            {user && (
-              <p className="mt-4 text-sm text-muted-foreground">
-                Logged in • Click above to access dashboards
-              </p>
-            )}
           </div>
         </section>
 

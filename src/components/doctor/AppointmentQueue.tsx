@@ -17,55 +17,37 @@ import {
 } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
-import { useFirestore, useUser, useMemoFirebase } from '@/firebase';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useCollection, useMemoFirebase } from '@/firebase/index';
+import { firestore } from '@/firebase/index';
 import { collection, query, where, orderBy } from 'firebase/firestore';
-import { format, startOfDay, endOfDay } from 'date-fns';
 
 interface Appointment {
   id: string;
   patientId: string;
-  patientName: string;
-  patientAvatar?: string;
-  appointmentTime: { seconds: number; nanoseconds: number };
-  type: 'Virtual' | 'In-Person';
+  appointmentTime: any; // Firestore Timestamp
+  reason: string;
   status: string;
-  reason?: string;
+  type: string;
 }
 
 export function AppointmentQueue() {
-  const firestore = useFirestore();
-  const { user } = useUser();
-
-  // Query for today's appointments for this doctor
-  const today = new Date();
-  const todayStart = startOfDay(today);
-  const todayEnd = endOfDay(today);
-
-  const appointmentsQuery = useMemoFirebase(
-    () => user ? query(
+  // Query appointments for the dummy doctor
+  const appointmentsQuery = useMemoFirebase(() => {
+    return query(
       collection(firestore, 'appointments'),
-      where('doctorId', '==', user.uid),
+      where('doctorId', '==', 'dr-demo-id'),
+      where('status', '==', 'upcoming'),
       orderBy('appointmentTime', 'asc')
-    ) : null,
-    [firestore, user]
-  );
+    );
+  }, []);
 
-  const { data: allAppointments, isLoading } = useCollection<Appointment>(appointmentsQuery);
-
-  // Filter for today's appointments client-side
-  const appointments = allAppointments?.filter(appt => {
-    const apptDate = new Date(appt.appointmentTime.seconds * 1000);
-    return apptDate >= todayStart && apptDate <= todayEnd;
-  });
+  const { data: appointments, isLoading } = useCollection<Appointment>(appointmentsQuery);
 
   const getStatusVariant = (status: string) => {
     switch (status) {
       case 'Checked In':
-      case 'checked_in':
         return 'default';
       case 'Waiting':
-      case 'waiting':
         return 'secondary';
       default:
         return 'outline';
@@ -82,58 +64,50 @@ export function AppointmentQueue() {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <p className="text-center text-muted-foreground py-8">
-            Loading appointments...
-          </p>
+          <p className="text-center text-muted-foreground py-8">Loading appointments...</p>
         ) : appointments && appointments.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Patient</TableHead>
                 <TableHead>Time</TableHead>
+                <TableHead>Reason</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead className="text-right">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {appointments.map((appt) => (
-                <TableRow key={appt.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-9 w-9">
-                        <AvatarImage src={appt.patientAvatar} alt={appt.patientName} />
-                        <AvatarFallback>
-                          {appt.patientName?.charAt(0) || 'P'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <span className="font-medium">{appt.patientName || 'Patient'}</span>
-                        {appt.reason && (
-                          <p className="text-xs text-muted-foreground">
-                            {appt.reason}
-                          </p>
-                        )}
+              {appointments.map((appt) => {
+                const appointmentDate = appt.appointmentTime?.toDate ? appt.appointmentTime.toDate() : new Date(appt.appointmentTime);
+                return (
+                  <TableRow key={appt.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-9 w-9">
+                          <AvatarImage src={`https://picsum.photos/seed/patient-${appt.patientId}/100/100`} alt="Patient" />
+                          <AvatarFallback>
+                            PT
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="font-medium">Patient #{appt.patientId.substring(0, 8)}</span>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {appt.appointmentTime 
-                      ? format(new Date(appt.appointmentTime.seconds * 1000), 'h:mm a')
-                      : 'TBD'}
-                  </TableCell>
-                  <TableCell>{appt.type}</TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant={getStatusVariant(appt.status)}>
-                      {appt.status}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell>{appointmentDate.toLocaleTimeString()}</TableCell>
+                    <TableCell>{appt.reason}</TableCell>
+                    <TableCell>{appt.type}</TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant={getStatusVariant(appt.status)}>
+                        {appt.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         ) : (
           <p className="text-center text-muted-foreground py-8">
-            No appointments scheduled for today.
+            No appointments in the queue.
           </p>
         )}
       </CardContent>
