@@ -3,6 +3,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -22,13 +23,16 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { Badge } from '../ui/badge';
+import { useAgora } from '@/hooks/use-agora';
+import { useUser } from '@/firebase/auth/use-user';
 
 export function VoiceAssistant() {
+  const { user } = useUser();
+  const channelName = user ? `voice-assistant-${user.uid}` : '';
+  const { isConnected, join, leave } = useAgora(channelName, user?.uid ?? null);
   const [symptoms, setSymptoms] = useState('');
   const [analysisResult, setAnalysisResult] = useState<AnalyzeSymptomsOutput | null>(null);
   const [isAnalyzing, startTransition] = useTransition();
-  const [isListening, setIsListening] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
 
@@ -63,15 +67,10 @@ export function VoiceAssistant() {
   };
 
   const handleMicClick = () => {
-    setIsListening(prev => !prev);
-    if(isSpeaking) setIsSpeaking(false);
-    // Placeholder for real voice logic
-    if(!isListening) {
-      setTimeout(() => {
-        setIsListening(false);
-        setIsSpeaking(true);
-        setTimeout(() => setIsSpeaking(false), 3000)
-      }, 3000)
+    if (isConnected) {
+      leave();
+    } else {
+      join();
     }
   }
 
@@ -91,18 +90,26 @@ export function VoiceAssistant() {
   return (
     <Card className="h-full flex flex-col">
       <CardHeader>
-        <CardTitle>AI Voice Assistant</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>AI Voice Assistant</CardTitle>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+            </span>
+            Active
+          </div>
+        </div>
         <CardDescription>
           How are you feeling today? Describe your symptoms below.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex-grow flex flex-col md:flex-row items-center gap-8">
         <div className="relative w-48 h-48 flex-shrink-0">
-          <div 
+          <div
             onClick={handleMicClick}
             className={`absolute inset-0 rounded-full bg-primary/20 flex items-center justify-center cursor-pointer
-              ${isListening ? 'orb-listening' : ''}
-              ${isSpeaking ? 'orb-speaking' : ''}
+              ${isConnected ? 'orb-speaking' : ''}
             `}
           >
             <div className="w-32 h-32 rounded-full bg-primary/50 flex items-center justify-center">
@@ -130,6 +137,9 @@ export function VoiceAssistant() {
           </Button>
         </div>
       </CardContent>
+      <CardFooter className="text-center text-xs text-muted-foreground justify-center">
+        Powered by the agora ✨ Conversational AI Engine
+      </CardFooter>
 
       {analysisResult && (
         <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
