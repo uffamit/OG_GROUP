@@ -94,10 +94,27 @@
   }
 }
 
+@keyframes spin-slow {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 .orb-listening {
   animation: pulse-orb 2s infinite;
 }
 
 .orb-speaking {
   animation: float 3s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 8s linear infinite;
+}
+
+.animation-delay-150 {
+  animation-delay: 150ms;
 }
