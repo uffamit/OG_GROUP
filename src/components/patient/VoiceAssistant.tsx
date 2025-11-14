@@ -38,20 +38,39 @@ export function VoiceAssistant() {
   const [isListening, setIsListening] = useState(false);
   const { toast } = useToast();
 
+  // Text-to-Speech helper function
+  const speak = useCallback((text: string) => {
+    if ('speechSynthesis' in window) {
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+      
+      window.speechSynthesis.speak(utterance);
+    }
+  }, []);
+
   const triggerEmergency = useCallback(async () => {
     setIsEmergencyDialogOpen(true);
+    speak('Emergency alert triggered. Help is on the way.');
     if (user) {
       try {
-        await addDoc(collection(firestore, 'alerts'), {
+        await addDoc(collection(firestore, 'emergencyAlerts'), {
           patientId: user.uid,
-          type: 'emergency',
+          patientName: user.displayName || 'Unknown Patient',
           timestamp: new Date(),
+          status: 'active',
+          location: 'Unknown',
+          reason: 'Emergency assistance requested via voice command',
         });
       } catch (error) {
         console.error('Failed to log emergency alert:', error);
       }
     }
-  }, [user]);
+  }, [user, speak]);
 
   const processVoiceCommand = useCallback(async (transcript: string) => {
     if (!user) {
@@ -91,11 +110,14 @@ export function VoiceAssistant() {
               agoraChannelId: crypto.randomUUID(), // Unique channel ID for call
               createdAt: new Date(),
             });
+            const confirmationMessage = `Your appointment is confirmed for ${new Date(data.dateTime).toLocaleString()}`;
+            speak(confirmationMessage);
             toast({
               title: 'Appointment Booked!',
               description: `Scheduled for ${new Date(data.dateTime).toLocaleString()} - ${data.reason}`,
             });
           } else {
+            speak('Sorry, I could not understand the appointment details. Please try again.');
             toast({
               title: 'Incomplete Information',
               description: 'Could not extract appointment details. Please try again.',
@@ -112,6 +134,7 @@ export function VoiceAssistant() {
               severity: data.severity || 'low',
               timestamp: new Date(),
             });
+            speak('Your symptom has been logged. Your doctor will be notified.');
             toast({
               title: 'Symptom Logged',
               description: 'Your doctor has been notified.',
@@ -127,6 +150,7 @@ export function VoiceAssistant() {
           break;
 
         case 'showSchedule':
+          speak('Check your upcoming appointments below.');
           toast({
             title: 'Schedule',
             description: 'Check your upcoming appointments below.',
@@ -134,6 +158,7 @@ export function VoiceAssistant() {
           break;
 
         default:
+          speak('I did not understand that command. Please try again.');
           toast({
             title: 'Command Not Understood',
             description: 'Please try rephrasing your request.',
@@ -142,13 +167,14 @@ export function VoiceAssistant() {
       }
     } catch (error) {
       console.error('Voice command processing error:', error);
+      speak('Sorry, there was an error processing your command.');
       toast({
         title: 'Processing Failed',
         description: error instanceof Error ? error.message : 'An unknown error occurred',
         variant: 'destructive',
       });
     }
-  }, [user, toast, triggerEmergency]);
+  }, [user, toast, triggerEmergency, speak]);
 
   const startListening = () => {
     // Check for browser support
@@ -168,6 +194,7 @@ export function VoiceAssistant() {
     recognition.maxAlternatives = 1;
 
     setIsListening(true);
+    speak('Listening. How can I help you?');
 
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
@@ -182,6 +209,7 @@ export function VoiceAssistant() {
 
     recognition.onerror = (event: any) => {
       console.error('Speech recognition error:', event.error);
+      speak('Sorry, I could not hear you. Please try again.');
       toast({
         title: 'Voice Recognition Failed',
         description: 'Could not capture voice. Please try again.',
@@ -258,19 +286,77 @@ export function VoiceAssistant() {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex-grow flex flex-col md:flex-row items-center gap-8">
-        <div className="relative w-48 h-48 flex-shrink-0">
+        <div className="relative w-64 h-64 flex-shrink-0">
+          {/* Outer pulsing glow ring */}
+          <div
+            className={`absolute inset-0 rounded-full transition-all duration-300 ${
+              isListening
+                ? 'bg-gradient-to-r from-red-500/30 to-pink-500/30 animate-pulse scale-110'
+                : 'bg-gradient-to-r from-blue-500/20 to-purple-500/20'
+            }`}
+            style={{
+              filter: 'blur(20px)',
+            }}
+          />
+          
+          {/* Middle ring with rotation */}
+          <div
+            className={`absolute inset-4 rounded-full transition-all duration-500 ${
+              isListening
+                ? 'bg-gradient-to-tr from-red-400/40 to-pink-400/40 animate-spin-slow'
+                : 'bg-gradient-to-tr from-blue-400/30 to-purple-400/30'
+            }`}
+            style={{
+              boxShadow: isListening
+                ? '0 0 60px rgba(239, 68, 68, 0.4), inset 0 0 20px rgba(239, 68, 68, 0.3)'
+                : '0 0 40px rgba(59, 130, 246, 0.3), inset 0 0 15px rgba(59, 130, 246, 0.2)',
+            }}
+          />
+          
+          {/* Voice Orb - clickable */}
           <div
             onClick={startListening}
-            className={`absolute inset-0 rounded-full bg-primary/20 flex items-center justify-center cursor-pointer transition-all
-              ${isListening ? 'orb-speaking animate-pulse' : 'hover:scale-105'}
-            `}
+            className={`absolute inset-8 rounded-full flex items-center justify-center cursor-pointer transition-all duration-300 ${
+              isListening
+                ? 'bg-gradient-to-br from-red-500 to-pink-600 scale-105 shadow-2xl'
+                : 'bg-gradient-to-br from-blue-600 to-purple-700 hover:scale-110 hover:shadow-2xl'
+            }`}
+            style={{
+              boxShadow: isListening
+                ? '0 0 80px rgba(239, 68, 68, 0.6), inset 0 0 30px rgba(255, 255, 255, 0.2)'
+                : '0 0 50px rgba(59, 130, 246, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.1)',
+            }}
           >
-            <div className="w-32 h-32 rounded-full bg-primary/50 flex items-center justify-center">
-              <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center">
-                <Mic className="h-10 w-10 text-primary-foreground" />
-              </div>
+            {/* Microphone icon */}
+            <div className="relative">
+              <Mic className={`h-16 w-16 text-white transition-all duration-300 ${
+                isListening ? 'animate-bounce' : ''
+              }`} />
+              
+              {/* Pulsing ring around mic when listening */}
+              {isListening && (
+                <>
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    <span className="absolute h-20 w-20 rounded-full border-4 border-white/30 animate-ping" />
+                  </span>
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    <span className="absolute h-24 w-24 rounded-full border-2 border-white/20 animate-ping animation-delay-150" />
+                  </span>
+                </>
+              )}
             </div>
           </div>
+          
+          {/* Central glow effect */}
+          <div
+            className={`absolute inset-16 rounded-full transition-opacity duration-300 ${
+              isListening ? 'opacity-100' : 'opacity-0'
+            }`}
+            style={{
+              background: 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, transparent 70%)',
+              filter: 'blur(10px)',
+            }}
+          />
         </div>
         <div className="w-full space-y-4">
           <Textarea

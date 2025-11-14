@@ -28,6 +28,7 @@ interface Appointment {
   reason: string;
   status: string;
   type: string;
+  createdAt?: any; // Firestore Timestamp
 }
 
 export function AppointmentQueue() {
@@ -79,8 +80,15 @@ export function AppointmentQueue() {
             <TableBody>
               {appointments.map((appt) => {
                 const appointmentDate = appt.appointmentTime?.toDate ? appt.appointmentTime.toDate() : new Date(appt.appointmentTime);
+                // Check if appointment was created recently (within last 5 seconds)
+                const createdAt = appt.createdAt?.toDate ? appt.createdAt.toDate() : null;
+                const isNew = createdAt && (Date.now() - createdAt.getTime()) < 5000;
+                
                 return (
-                  <TableRow key={appt.id}>
+                  <TableRow 
+                    key={appt.id}
+                    className={isNew ? 'animate-pulse bg-primary/10' : ''}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9">

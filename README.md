@@ -11,12 +11,15 @@ A comprehensive, production-ready healthcare management platform with real-time 
 - Book appointments via voice: "Book an appointment for tomorrow at 4 PM for my cough"
 - Trigger emergency alerts: "Help, I've fallen!"
 - Symptom analysis with AI-powered diagnosis suggestions
+- **Audio Feedback (TTS)**: AI assistant speaks back confirmations using browser's built-in text-to-speech
+- **Enhanced Voice Orb**: Beautiful multi-layered design with pulsing effects and animations
 
 ### 🔥 Real-Time Firestore Integration
 - Live appointment updates across patient and doctor dashboards
 - Instant emergency alert notifications
 - Real-time medication and routine tracking
 - Automatic synchronization without page refresh
+- **Visual feedback**: New appointments pulse and highlight for 5 seconds (the "wow" moment!)
 
 ### 🚨 Emergency Alert System
 - One-click emergency button for patients
