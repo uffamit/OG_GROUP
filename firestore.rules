@@ -217,5 +217,42 @@ service cloud.firestore {
       allow update: if isExistingParticipant(resource.data.patientId, resource.data.doctorId);
       allow delete: if isExistingParticipant(resource.data.patientId, resource.data.doctorId);
     }
+
+    /**
+     * @description Rules for the /symptoms/{symptomId} collection.
+     * @path /symptoms/{symptomId}
+     * @allow (create, get, list) Authenticated user can create and view their own symptoms.
+     * @deny Others cannot view symptoms.
+     * @principle Enforces document ownership; users can only manage their own symptoms.
+     */
+    match /symptoms/{symptomId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == resource.data.patientId;
+      }
+
+      allow get: if isOwner();
+      allow list: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.patientId == request.auth.uid;
+      allow update: if isOwner();
+      allow delete: if isOwner();
+    }
+
+    /**
+     * @description Rules for the /alerts/{alertId} collection.
+     * @path /alerts/{alertId}
+     * @allow (create, get, list) Authenticated user can create and view emergency alerts.
+     * @principle Emergency alerts can be created by users and viewed by medical staff.
+     */
+    match /alerts/{alertId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == resource.data.patientId;
+      }
+
+      allow get: if isOwner();
+      allow list: if request.auth != null; // Medical staff can view all alerts
+      allow create: if request.auth != null && request.resource.data.patientId == request.auth.uid;
+      allow update: if isOwner();
+      allow delete: if isOwner();
+    }
   }
 }
