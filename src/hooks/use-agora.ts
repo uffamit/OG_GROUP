@@ -12,11 +12,16 @@ import { useToast } from './use-toast';
 // This should be in a config file, but for simplicity it's here.
 const AGORA_APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
 
+interface CallSummary {
+  transcript: string;
+}
+
 export const useAgora = (channelName: string, userId: UID | null) => {
   const [client, setClient] = useState<IAgoraRTCClient | null>(null);
   const [localAudioTrack, setLocalAudioTrack] = useState<IMicrophoneAudioTrack | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [agentId, setAgentId] = useState<string | null>(null);
+  const [callSummary, setCallSummary] = useState<CallSummary | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -101,12 +106,19 @@ export const useAgora = (channelName: string, userId: UID | null) => {
     if (!client || !agentId) return;
 
     try {
-      // Stop AI agent
-      await fetch('/api/agora/stop', {
+      // Stop AI agent and fetch transcript
+      const stopRes = await fetch('/api/agora/stop', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agentId }),
       });
+      
+      const stopData = await stopRes.json();
+      
+      // If transcript is available, set it for summary
+      if (stopData.transcript) {
+        setCallSummary({ transcript: stopData.transcript });
+      }
 
       // Clean up local tracks and leave channel
       localAudioTrack?.close();
@@ -122,5 +134,9 @@ export const useAgora = (channelName: string, userId: UID | null) => {
     }
   }, [client, agentId, localAudioTrack, toast]);
 
-  return { isConnected, join, leave };
+  const clearSummary = useCallback(() => {
+    setCallSummary(null);
+  }, []);
+
+  return { isConnected, join, leave, callSummary, clearSummary };
 };
