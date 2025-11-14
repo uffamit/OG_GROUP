@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
   const { channelName, uid } = await request.json();
 
-  const appId = process.env.AGORA_APP_ID;
+  const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID;
   const appCertificate = process.env.AGORA_APP_CERTIFICATE;
 
   if (!appId || !appCertificate) {
@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     channelName,
     numericUid,
     role,
+    privilegeExpiredTs,
     privilegeExpiredTs
   );
 

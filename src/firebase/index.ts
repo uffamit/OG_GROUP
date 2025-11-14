@@ -36,11 +36,10 @@ initializeFirebase();
 export { firebaseApp, auth, firestore, initializeFirebase };
 
 // Export hooks and providers
-export * from './provider';
+export { FirebaseProvider, useFirebase, useAuth, useFirestore, useFirebaseApp, useMemoFirebase, useUser } from './provider';
 export * from './client-provider';
 export * from './firestore/use-collection';
 export * from './firestore/use-doc';
-export * from './auth/use-user';
 export * from './non-blocking-updates';
 export * from './non-blocking-login';
 export * from './errors';
