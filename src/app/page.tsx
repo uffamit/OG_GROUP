@@ -1,3 +1,5 @@
+'use client';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -8,8 +10,12 @@ import {
   User,
   Video,
 } from 'lucide-react';
-import Link from 'next/link';
 import { Logo } from '@/components/icons';
+import { auth } from '@/firebase/index';
+import { signInAnonymously } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
 
 const features = [
   {
@@ -45,6 +51,31 @@ const features = [
 ];
 
 export default function LandingPage() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState<string | null>(null);
+
+  const handleLogin = async (role: 'patient' | 'doctor') => {
+    setIsLoading(role);
+    try {
+      await signInAnonymously(auth);
+      localStorage.setItem('userRole', role);
+      router.push(role === 'patient' ? '/patient/dashboard' : '/doctor/dashboard');
+      toast({
+        title: 'Success',
+        description: `Logged in as ${role === 'patient' ? 'Patient' : 'Doctor'}`,
+      });
+    } catch (error) {
+      console.error('Anonymous login failed', error);
+      toast({
+        title: 'Login Failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+      setIsLoading(null);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -69,11 +100,22 @@ export default function LandingPage() {
               control. Seamlessly manage your health with AI-powered assistance.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row justify-center gap-4">
-                <Button asChild size="lg" className="font-semibold">
-                  <Link href="/patient/dashboard">Enter as Patient</Link>
+                <Button 
+                  size="lg" 
+                  className="font-semibold"
+                  onClick={() => handleLogin('patient')}
+                  disabled={isLoading !== null}
+                >
+                  {isLoading === 'patient' ? 'Loading...' : 'Login as Patient'}
                 </Button>
-                <Button asChild size="lg" variant="secondary" className="font-semibold">
-                  <Link href="/doctor/dashboard">Enter as Doctor</Link>
+                <Button 
+                  size="lg" 
+                  variant="secondary" 
+                  className="font-semibold"
+                  onClick={() => handleLogin('doctor')}
+                  disabled={isLoading !== null}
+                >
+                  {isLoading === 'doctor' ? 'Loading...' : 'View Doctor Dashboard (Demo)'}
                 </Button>
             </div>
           </div>

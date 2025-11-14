@@ -9,140 +9,212 @@ import {
 } from '@/components/ui/card';
 import { Textarea } from '../ui/textarea';
 import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Mic, Send, Loader2, AlertTriangle } from 'lucide-react';
-import { useState, useTransition, useEffect } from 'react';
+import { Mic, Send } from 'lucide-react';
+import { useState, useTransition, useCallback } from 'react';
 import { analyzeSymptoms, AnalyzeSymptomsOutput } from '@/ai/flows/voice-assistant-symptom-analysis';
-import { summarizeCall } from '@/ai/flows/summarize-call';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
   AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../ui/dialog';
 import { Badge } from '../ui/badge';
-import { useAgora } from '@/hooks/use-agora';
 import { useUser } from '@/firebase/auth/use-user';
+import { firestore } from '@/firebase/index';
 import { addDoc, collection } from 'firebase/firestore';
-import { firestore } from '@/firebase';
 
 export function VoiceAssistant() {
   const { user } = useUser();
-  const channelName = user ? `voice-assistant-${user.uid}` : '';
-  const { isConnected, join, leave, callSummary, clearSummary } = useAgora(channelName, user?.uid ?? null);
   const [symptoms, setSymptoms] = useState('');
-  const [manualInput, setManualInput] = useState('');
   const [analysisResult, setAnalysisResult] = useState<AnalyzeSymptomsOutput | null>(null);
   const [isAnalyzing, startTransition] = useTransition();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
-  const [summaryData, setSummaryData] = useState<{
-    keyPoints: string[];
-    symptomsDiscussed: string[];
-    actionItems: string[];
-    overallSummary: string;
-  } | null>(null);
-  const [isProcessingSummary, setIsProcessingSummary] = useState(false);
+  const [isEmergencyDialogOpen, setIsEmergencyDialogOpen] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const { toast } = useToast();
 
-  // Handle call summary when available
-  useEffect(() => {
-    if (callSummary && callSummary.transcript) {
-      setIsProcessingSummary(true);
-      summarizeCall({ transcript: callSummary.transcript })
-        .then((summary) => {
-          setSummaryData(summary);
-          setIsSummaryDialogOpen(true);
-          speak('Your call has ended. I have prepared a summary for you.');
-        })
-        .catch((error) => {
-          console.error('Failed to summarize call:', error);
-          toast({
-            title: 'Summary Failed',
-            description: 'Could not generate call summary.',
-            variant: 'destructive',
-          });
-        })
-        .finally(() => {
-          setIsProcessingSummary(false);
-          clearSummary();
+  const triggerEmergency = useCallback(async () => {
+    setIsEmergencyDialogOpen(true);
+    if (user) {
+      try {
+        await addDoc(collection(firestore, 'alerts'), {
+          patientId: user.uid,
+          type: 'emergency',
+          timestamp: new Date(),
         });
+      } catch (error) {
+        console.error('Failed to log emergency alert:', error);
+      }
     }
-  }, [callSummary, clearSummary, toast]);
+  }, [user]);
 
-  // Text-to-Speech function
-  const speak = (text: string) => {
-    if (!window.speechSynthesis) {
-      console.warn('Speech synthesis not supported');
+  const processVoiceCommand = useCallback(async (transcript: string) => {
+    if (!user) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please log in first.',
+        variant: 'destructive',
+      });
       return;
     }
-    // Cancel any ongoing speech
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.9;
-    utterance.pitch = 1;
-    utterance.volume = 1;
-    window.speechSynthesis.speak(utterance);
+
+    try {
+      // Call AI intent parser
+      const response = await fetch('/api/ai/parse-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to parse intent');
+      }
+
+      const data = await response.json();
+
+      // Handle different intents
+      switch (data.intent) {
+        case 'bookAppointment':
+          if (data.dateTime && data.reason) {
+            await addDoc(collection(firestore, 'appointments'), {
+              patientId: user.uid,
+              doctorId: 'dr-demo-id', // Dummy Doctor ID
+              appointmentTime: new Date(data.dateTime),
+              reason: data.reason,
+              status: 'upcoming',
+              type: 'Virtual',
+              agoraChannelId: crypto.randomUUID(), // Unique channel ID for call
+              createdAt: new Date(),
+            });
+            toast({
+              title: 'Appointment Booked!',
+              description: `Scheduled for ${new Date(data.dateTime).toLocaleString()} - ${data.reason}`,
+            });
+          } else {
+            toast({
+              title: 'Incomplete Information',
+              description: 'Could not extract appointment details. Please try again.',
+              variant: 'destructive',
+            });
+          }
+          break;
+
+        case 'reportSymptom':
+          if (data.symptom) {
+            await addDoc(collection(firestore, 'symptoms'), {
+              patientId: user.uid,
+              symptom: data.symptom,
+              severity: data.severity || 'low',
+              timestamp: new Date(),
+            });
+            toast({
+              title: 'Symptom Logged',
+              description: 'Your doctor has been notified.',
+            });
+            if (data.severity === 'high') {
+              triggerEmergency();
+            }
+          }
+          break;
+
+        case 'emergency':
+          triggerEmergency();
+          break;
+
+        case 'showSchedule':
+          toast({
+            title: 'Schedule',
+            description: 'Check your upcoming appointments below.',
+          });
+          break;
+
+        default:
+          toast({
+            title: 'Command Not Understood',
+            description: 'Please try rephrasing your request.',
+            variant: 'destructive',
+          });
+      }
+    } catch (error) {
+      console.error('Voice command processing error:', error);
+      toast({
+        title: 'Processing Failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive',
+      });
+    }
+  }, [user, toast, triggerEmergency]);
+
+  const startListening = () => {
+    // Check for browser support
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast({
+        title: 'Not Supported',
+        description: 'Voice commands are not supported in this browser.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    setIsListening(true);
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setSymptoms(transcript);
+      toast({
+        title: 'Voice Command Received',
+        description: `Processing: "${transcript}"`,
+      });
+      processVoiceCommand(transcript);
+      setIsListening(false);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      toast({
+        title: 'Voice Recognition Failed',
+        description: 'Could not capture voice. Please try again.',
+        variant: 'destructive',
+      });
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
   };
 
-  const handleSymptomAnalysis = (symptomsText?: string) => {
-    const textToAnalyze = symptomsText || symptoms;
-    if (!textToAnalyze.trim()) {
+  const handleSymptomAnalysis = () => {
+    if (!symptoms.trim()) {
       toast({
         title: 'No symptoms entered',
         description: 'Please describe your symptoms before analyzing.',
         variant: 'destructive',
       });
-      speak('Please describe your symptoms before analyzing.');
       return;
     }
 
     startTransition(async () => {
       try {
         const result = await analyzeSymptoms({
-          symptomsDescription: textToAnalyze,
+          symptomsDescription: symptoms,
         });
         setAnalysisResult(result);
         setIsDialogOpen(true);
-        
-        // Voice feedback based on urgency
-        if (result.urgencyLevel === 'high') {
-          speak(`Urgent attention needed. ${result.recommendations}`);
-          // Trigger emergency alert for high urgency
-          if (user) {
-            await addDoc(collection(firestore, 'alerts'), {
-              patientId: user.uid,
-              type: 'HIGH_URGENCY_SYMPTOM',
-              urgencyLevel: result.urgencyLevel,
-              symptoms: textToAnalyze,
-              diagnoses: result.diagnosisSuggestions,
-              timestamp: new Date(),
-            });
-          }
-        } else if (result.urgencyLevel === 'medium') {
-          speak(`Your symptoms have been analyzed. Moderate urgency detected. ${result.recommendations}`);
-        } else {
-          speak(`Your symptoms have been analyzed. Low urgency. ${result.recommendations}`);
-        }
-        
-        toast({
-          title: 'Analysis Complete',
-          description: `Urgency Level: ${result.urgencyLevel}`,
-        });
       } catch (error) {
-        speak('Could not analyze symptoms. Please try again.');
         toast({
           title: 'Analysis Failed',
           description:
@@ -153,55 +225,6 @@ export function VoiceAssistant() {
         setAnalysisResult(null);
       }
     });
-  };
-
-  const handleManualSubmit = () => {
-    if (manualInput.trim()) {
-      handleSymptomAnalysis(manualInput);
-      setManualInput('');
-    }
-  };
-
-  const handleEmergency = async () => {
-    if (!user) {
-      toast({
-        title: 'Error',
-        description: 'You must be logged in to trigger an emergency alert.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      await addDoc(collection(firestore, 'alerts'), {
-        patientId: user.uid,
-        type: 'EMERGENCY',
-        timestamp: new Date(),
-        symptoms: symptoms || 'Emergency button pressed',
-      });
-      speak('Emergency alert sent to medical staff.');
-      toast({
-        title: 'Emergency Alert Sent',
-        description: 'Medical staff has been notified.',
-        variant: 'destructive',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to send emergency alert.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleMicClick = () => {
-    if (isConnected) {
-      leave();
-      speak('Voice assistant disconnected.');
-    } else {
-      join();
-      speak('Voice assistant connected. How can I help you today?');
-    }
   };
 
   const getUrgencyBadgeVariant = (
@@ -224,92 +247,83 @@ export function VoiceAssistant() {
           <CardTitle>AI Voice Assistant</CardTitle>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isListening ? 'bg-red-400' : 'bg-green-400'} opacity-75`}></span>
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${isListening ? 'bg-red-500' : 'bg-green-500'}`}></span>
             </span>
-            Active
+            {isListening ? 'Listening...' : 'Ready'}
           </div>
         </div>
         <CardDescription>
-          How are you feeling today? Describe your symptoms below.
+          Tap the orb to speak or type your command below.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex-grow flex flex-col md:flex-row items-center gap-8">
         <div className="relative w-48 h-48 flex-shrink-0">
           <div
-            onClick={handleMicClick}
+            onClick={startListening}
             className={`absolute inset-0 rounded-full bg-primary/20 flex items-center justify-center cursor-pointer transition-all
-              ${isConnected ? 'orb-speaking' : ''}
-              ${isAnalyzing ? 'orb-listening' : ''}
+              ${isListening ? 'orb-speaking animate-pulse' : 'hover:scale-105'}
             `}
           >
             <div className="w-32 h-32 rounded-full bg-primary/50 flex items-center justify-center">
               <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center">
-                {isAnalyzing ? (
-                  <Loader2 className="h-10 w-10 text-primary-foreground animate-spin" />
-                ) : (
-                  <Mic className="h-10 w-10 text-primary-foreground" />
-                )}
+                <Mic className="h-10 w-10 text-primary-foreground" />
               </div>
             </div>
           </div>
         </div>
         <div className="w-full space-y-4">
           <Textarea
-            placeholder="e.g., I have a throbbing headache and feel nauseous..."
+            placeholder="e.g., Book an appointment with a doctor for tomorrow at 3 PM for my cough..."
             className="min-h-[100px] text-base"
             value={symptoms}
             onChange={(e) => setSymptoms(e.target.value)}
-            disabled={isAnalyzing}
+            disabled={isAnalyzing || isListening}
           />
-          <Button
-            className="w-full"
-            onClick={() => handleSymptomAnalysis()}
-            disabled={isAnalyzing}
-          >
-            <Send className="mr-2 h-4 w-4" />
-            {isAnalyzing ? 'Analyzing...' : 'Analyze Symptoms'}
-          </Button>
-          
-          {/* Manual Text Input Fallback */}
-          <div className="flex gap-2 pt-2 border-t">
-            <Input
-              placeholder="Or type a quick command..."
-              value={manualInput}
-              onChange={(e) => setManualInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !isAnalyzing) {
-                  handleManualSubmit();
-                }
-              }}
-              disabled={isAnalyzing}
-              className="flex-1"
-            />
+          <div className="flex gap-2">
             <Button
-              onClick={handleManualSubmit}
-              disabled={isAnalyzing || !manualInput.trim()}
-              size="icon"
+              className="flex-1"
+              onClick={() => processVoiceCommand(symptoms)}
+              disabled={isAnalyzing || isListening || !symptoms.trim()}
             >
-              <Send className="h-4 w-4" />
+              <Send className="mr-2 h-4 w-4" />
+              {isAnalyzing ? 'Processing...' : 'Process Command'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleSymptomAnalysis}
+              disabled={isAnalyzing || isListening || !symptoms.trim()}
+            >
+              Analyze Symptoms
             </Button>
           </div>
-
-          {/* Emergency Button */}
-          <Button
-            variant="destructive"
-            className="w-full"
-            onClick={handleEmergency}
-            disabled={isAnalyzing}
-          >
-            <AlertTriangle className="mr-2 h-4 w-4" />
-            Emergency Alert
-          </Button>
         </div>
       </CardContent>
       <CardFooter className="text-center text-xs text-muted-foreground justify-center">
-        Powered by the agora ✨ Conversational AI Engine
+        Powered by Gemini AI ✨
       </CardFooter>
 
+      {/* Emergency Dialog */}
+      <AlertDialog open={isEmergencyDialogOpen} onOpenChange={setIsEmergencyDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Emergency Alert</AlertDialogTitle>
+            <AlertDialogDescription>
+              This appears to be an emergency situation. Would you like to call emergency services?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <a href="tel:108" className="bg-destructive hover:bg-destructive/90">
+                Call 108 (Emergency)
+              </a>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Symptom Analysis Dialog */}
       {analysisResult && (
         <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <AlertDialogContent>
@@ -345,67 +359,6 @@ export function VoiceAssistant() {
           </AlertDialogContent>
         </AlertDialog>
       )}
-
-      {/* Call Summary Dialog */}
-      <Dialog open={isSummaryDialogOpen} onOpenChange={setIsSummaryDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Call Summary</DialogTitle>
-            <DialogDescription>
-              Here's a summary of your conversation with the AI assistant.
-            </DialogDescription>
-          </DialogHeader>
-          {isProcessingSummary ? (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <span className="ml-2">Generating summary...</span>
-            </div>
-          ) : summaryData ? (
-            <div className="space-y-6 py-4">
-              <div>
-                <h4 className="font-semibold mb-3 text-lg">Overall Summary</h4>
-                <p className="text-sm text-muted-foreground">{summaryData.overallSummary}</p>
-              </div>
-              
-              {summaryData.keyPoints.length > 0 && (
-                <div>
-                  <h4 className="font-semibold mb-2">Key Points</h4>
-                  <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    {summaryData.keyPoints.map((point, idx) => (
-                      <li key={idx}>{point}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              
-              {summaryData.symptomsDiscussed.length > 0 && (
-                <div>
-                  <h4 className="font-semibold mb-2">Symptoms Discussed</h4>
-                  <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    {summaryData.symptomsDiscussed.map((symptom, idx) => (
-                      <li key={idx}>{symptom}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              
-              {summaryData.actionItems.length > 0 && (
-                <div>
-                  <h4 className="font-semibold mb-2">Action Items</h4>
-                  <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    {summaryData.actionItems.map((item, idx) => (
-                      <li key={idx}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          ) : null}
-          <DialogFooter>
-            <Button onClick={() => setIsSummaryDialogOpen(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 }
