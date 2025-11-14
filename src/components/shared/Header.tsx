@@ -12,8 +12,6 @@ import {
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { LogOut, User } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useUser } from '@/firebase/auth/use-user';
-import { useAuth } from '@/firebase';
 
 function getTitle(pathname: string): string {
   if (pathname.includes('/doctor')) {
@@ -31,21 +29,22 @@ function getTitle(pathname: string): string {
   return 'AgoraMedAI';
 }
 
+const dummyUser = {
+    displayName: 'Demo User',
+    email: 'demo@example.com',
+    photoURL: 'https://picsum.photos/seed/user/100/100',
+};
+
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  const auth = useAuth();
-  const { user } = useUser();
   const title = getTitle(pathname);
 
   const handleLogout = async () => {
-    if (auth) {
-      await auth.signOut();
       router.push('/auth/login');
-    }
   };
   
-  const userInitial = user?.displayName?.charAt(0) || 'U';
+  const userInitial = dummyUser?.displayName?.charAt(0) || 'U';
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
@@ -59,7 +58,7 @@ export function Header() {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-10 w-10 rounded-full">
             <Avatar className="h-10 w-10">
-              <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || ''} />
+              <AvatarImage src={dummyUser?.photoURL || undefined} alt={dummyUser?.displayName || ''} />
               <AvatarFallback>{userInitial}</AvatarFallback>
             </Avatar>
           </Button>
@@ -67,9 +66,9 @@ export function Header() {
         <DropdownMenuContent className="w-56" align="end">
           <DropdownMenuLabel>
             <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium leading-none">{user?.displayName}</p>
+              <p className="text-sm font-medium leading-none">{dummyUser?.displayName}</p>
               <p className="text-xs leading-none text-muted-foreground">
-                {user?.email}
+                {dummyUser?.email}
               </p>
             </div>
           </DropdownMenuLabel>
