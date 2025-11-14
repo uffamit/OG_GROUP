@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     channelName,
     numericUid,
     role,
+    privilegeExpiredTs,
     privilegeExpiredTs
   );
 
