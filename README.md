@@ -200,11 +200,6 @@ npm run typecheck    # Type checking with TypeScript
 npm run genkit:dev   # Start Genkit development server
 ```
 
-## Security Notes
-
-⚠️ **Never commit your `.env.local` file to version control**
-
-The template file (`.env.local.template`) is provided for reference only. All sensitive credentials should be stored in `.env.local` which is gitignored.
 
 ## License
 
