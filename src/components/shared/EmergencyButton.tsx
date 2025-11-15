@@ -23,21 +23,15 @@ export function EmergencyButton() {
   const firestore = useFirestore();
 
   const handleEmergency = async () => {
-    if (!user) {
-      toast({
-        title: 'Authentication Required',
-        description: 'You must be logged in to trigger an emergency alert.',
-        variant: 'destructive',
-      });
-      return;
-    }
+    const userId = user?.uid || 'demo-patient-' + Date.now();
+    const userName = user?.displayName || 'Demo Patient';
 
     try {
       // Write emergency alert to Firestore
       const emergencyAlertsRef = collection(firestore, 'emergencyAlerts');
       await addDoc(emergencyAlertsRef, {
-        patientId: user.uid,
-        patientName: user.displayName || 'Unknown Patient',
+        patientId: userId,
+        patientName: userName,
         timestamp: serverTimestamp(),
         status: 'active',
         location: 'Unknown', // Could be enhanced with geolocation
