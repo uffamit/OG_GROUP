@@ -56,31 +56,26 @@ export function VoiceAssistant() {
   const triggerEmergency = useCallback(async () => {
     setIsEmergencyDialogOpen(true);
     speak('Emergency alert triggered. Help is on the way.');
-    if (user) {
-      try {
-        await addDoc(collection(firestore, 'emergencyAlerts'), {
-          patientId: user.uid,
-          patientName: user.displayName || 'Unknown Patient',
-          timestamp: new Date(),
-          status: 'active',
-          location: 'Unknown',
-          reason: 'Emergency assistance requested via voice command',
-        });
-      } catch (error) {
-        console.error('Failed to log emergency alert:', error);
-      }
+    const userId = user?.uid || 'demo-patient-' + Date.now();
+    const userName = user?.displayName || 'Demo Patient';
+    
+    try {
+      await addDoc(collection(firestore, 'emergencyAlerts'), {
+        patientId: userId,
+        patientName: userName,
+        timestamp: new Date(),
+        status: 'active',
+        location: 'Unknown',
+        reason: 'Emergency assistance requested via voice command',
+      });
+    } catch (error) {
+      console.error('Failed to log emergency alert:', error);
     }
   }, [user, speak]);
 
   const processVoiceCommand = useCallback(async (transcript: string) => {
-    if (!user) {
-      toast({
-        title: 'Authentication Required',
-        description: 'Please log in first.',
-        variant: 'destructive',
-      });
-      return;
-    }
+    // Generate a demo user ID if user is not available
+    const userId = user?.uid || 'demo-patient-' + Date.now();
 
     try {
       // Call AI intent parser
@@ -101,7 +96,7 @@ export function VoiceAssistant() {
         case 'bookAppointment':
           if (data.dateTime && data.reason) {
             await addDoc(collection(firestore, 'appointments'), {
-              patientId: user.uid,
+              patientId: userId,
               doctorId: 'dr-demo-id', // Dummy Doctor ID
               appointmentTime: new Date(data.dateTime),
               reason: data.reason,
@@ -129,7 +124,7 @@ export function VoiceAssistant() {
         case 'reportSymptom':
           if (data.symptom) {
             await addDoc(collection(firestore, 'symptoms'), {
-              patientId: user.uid,
+              patientId: userId,
               symptom: data.symptom,
               severity: data.severity || 'low',
               timestamp: new Date(),
