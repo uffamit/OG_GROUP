@@ -7,7 +7,7 @@ A comprehensive, production-ready healthcare management platform with real-time 
 ## Features
 
 ### 🎤 AI Voice Assistant
-- Voice command parsing using Google AI (Gemini)
+- Voice command parsing using agora 
 - Book appointments via voice: "Book an appointment for tomorrow at 4 PM for my cough"
 - Trigger emergency alerts: "Help, I've fallen!"
 - Symptom analysis with AI-powered diagnosis suggestions
