@@ -203,4 +203,4 @@ npm run genkit:dev   # Start Genkit development server
 
 ## License
 
-All rights reserved - OG GROUP © 2024
+All rights reserved - OG GROUP © 2025
